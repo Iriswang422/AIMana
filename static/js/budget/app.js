@@ -199,7 +199,7 @@ const BudgetApp = {
 
         html.push('<div class="dash-header">');
         html.push('<div class="dash-title">预算使用概览</div>');
-        html.push(`<div class="dash-subtitle">FY26 年度 · 截至 ${new Date().getFullYear()}年${new Date().getMonth()+1}月</div>`);
+        html.push(`<div class="dash-subtitle">FY26 年度 · 共 ${budgetData.length} 条预算明细 · ${actualsData.length} 条实际记录</div>`);
         html.push('</div>');
 
         // KPI Cards
@@ -208,7 +208,7 @@ const BudgetApp = {
             <div class="kpi-icon">&#128176;</div>
             <div class="kpi-body">
                 <div class="kpi-label">全年总预算</div>
-                <div class="kpi-value">${this._fmt(totalBudget)}</div>
+                <div class="kpi-value">${this._fmtWan(totalBudget)}</div>
             </div>
             <div class="kpi-foot">${budgetData.length} 条明细</div>
         </div>`);
@@ -216,7 +216,7 @@ const BudgetApp = {
             <div class="kpi-icon">&#128184;</div>
             <div class="kpi-body">
                 <div class="kpi-label">累计已使用</div>
-                <div class="kpi-value">${this._fmt(totalActual)}</div>
+                <div class="kpi-value">${this._fmtWan(totalActual)}</div>
             </div>
             <div class="kpi-foot">使用率 <b>${usageRate.toFixed(1)}%</b></div>
         </div>`);
@@ -224,7 +224,7 @@ const BudgetApp = {
             <div class="kpi-icon">&#128178;</div>
             <div class="kpi-body">
                 <div class="kpi-label">剩余预算</div>
-                <div class="kpi-value">${this._fmt(remaining)}</div>
+                <div class="kpi-value">${this._fmtWan(remaining)}</div>
             </div>
             <div class="kpi-foot">${remaining >= 0 ? '可用余额' : '已超支'}</div>
         </div>`);
@@ -243,11 +243,11 @@ const BudgetApp = {
             for (let m = 1; m <= 12; m++) projectMap[proj].actual += row.monthly[`month_${m}`] || 0;
         });
 
-        html.push('<div class="summary-section">');
+        html.push('<div class="summary-section" style="animation-delay:0.2s">');
         html.push('<div class="sec-title">各项目预算使用进度</div>');
         html.push('<div class="progress-grid">');
 
-        Object.keys(projectMap).sort((a, b) => projectMap[b].budget - projectMap[a].budget).forEach(proj => {
+        Object.keys(projectMap).sort((a, b) => projectMap[b].budget - projectMap[a].budget).forEach((proj, idx) => {
             const p = projectMap[proj];
             const pct = p.budget > 0 ? (p.actual / p.budget * 100) : 0;
             const cInfo = this._pctColor(pct);
@@ -259,12 +259,12 @@ const BudgetApp = {
                     <span class="prog-pct" style="color:${cInfo.color}">${pct.toFixed(1)}%</span>
                 </div>
                 <div class="prog-track">
-                    <div class="prog-fill" style="width:${Math.min(pct, 100)}%;background:${cInfo.grad}"></div>
+                    <div class="prog-fill" style="width:${Math.min(pct, 100)}%;background:${cInfo.grad};animation-delay:${idx * 0.05}s"></div>
                 </div>
                 <div class="prog-stats">
-                    <span>预算 <b>${this._fmt(p.budget)}</b></span>
-                    <span>实际 <b>${this._fmt(p.actual)}</b></span>
-                    <span>剩余 <b style="color:${remain >= 0 ? '#52c41a' : '#ff4d4f'}">${this._fmt(remain)}</b></span>
+                    <span>预算 <b>${this._fmtWan(p.budget)}</b></span>
+                    <span>实际 <b>${this._fmtWan(p.actual)}</b></span>
+                    <span>剩余 <b style="color:${remain >= 0 ? '#00b578' : '#ff4d4f'}">${this._fmtWan(remain)}</b></span>
                 </div>
             </div>`);
         });
@@ -283,7 +283,7 @@ const BudgetApp = {
             for (let m = 1; m <= 12; m++) ownerMap[owner].actual += row.monthly[`month_${m}`] || 0;
         });
 
-        html.push('<div class="summary-section">');
+        html.push('<div class="summary-section" style="animation-delay:0.3s">');
         html.push('<div class="sec-title">各负责人预算使用进度</div>');
         html.push('<div class="ring-grid">');
 
@@ -314,16 +314,16 @@ const BudgetApp = {
                 </svg>
                 <div class="ring-name">${this._esc(owner)}</div>
                 <div class="ring-meta">
-                    <div class="ring-meta-row"><span>预算</span><b>${this._fmt(o.budget)}</b></div>
-                    <div class="ring-meta-row"><span>实际</span><b>${this._fmt(o.actual)}</b></div>
-                    <div class="ring-meta-row"><span>剩余</span><b style="color:${remain >= 0 ? '#52c41a' : '#ff4d4f'}">${this._fmt(remain)}</b></div>
+                    <div class="ring-meta-row"><span>预算</span><b>${this._fmtWan(o.budget)}</b></div>
+                    <div class="ring-meta-row"><span>实际</span><b>${this._fmtWan(o.actual)}</b></div>
+                    <div class="ring-meta-row"><span>剩余</span><b style="color:${remain >= 0 ? '#00b578' : '#ff4d4f'}">${this._fmtWan(remain)}</b></div>
                 </div>
             </div>`);
         });
         html.push('</div></div>');
 
         // Monthly bar chart
-        html.push('<div class="summary-section">');
+        html.push('<div class="summary-section" style="animation-delay:0.4s">');
         html.push('<div class="sec-title">月度预算 vs 实际对比</div>');
         html.push('<div class="chart-wrap">');
         html.push('<div class="chart-legend">');
@@ -747,6 +747,15 @@ const BudgetApp = {
     _fmt(val) {
         if (val === 0 || val === null || val === undefined) return '-';
         return Number(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+    },
+    _fmtWan(val) {
+        if (val === 0 || val === null || val === undefined) return '-';
+        const abs = Math.abs(val);
+        const sign = val < 0 ? '-' : '';
+        if (abs >= 10000) {
+            return sign + (abs / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 1 }) + '万';
+        }
+        return sign + abs.toLocaleString('zh-CN', { maximumFractionDigits: 0 });
     },
     _parseNum(str) {
         if (!str || str === '-') return 0;
