@@ -248,7 +248,7 @@ const BudgetApp = {
 
         // Progress by project
         html += '<div class="summary-section">';
-        html += '<div class="section-title"><span class="icon">&#9632;</span> 各团队预算使用进度</div>';
+        html += '<div class="section-title"><span class="icon">&#9632;</span> 各项目预算使用进度</div>';
         html += '<div class="progress-grid">';
 
         const projects = Object.keys(projectMap).sort((a, b) => projectMap[b].budget - projectMap[a].budget);
@@ -271,6 +271,59 @@ const BudgetApp = {
                     <span><i class="dot budget-dot"></i>预算 ${this._fmt(p.budget)}</span>
                     <span><i class="dot actual-dot"></i>实际 ${this._fmt(p.actual)}</span>
                     <span><i class="dot remain-dot"></i>剩余 ${this._fmt(remain)}</span>
+                </div>
+            </div>`;
+        });
+        html += '</div></div>';
+
+        // Progress by owner (ring chart)
+        const ownerMap = {};
+        budgetData.forEach(row => {
+            const owner = row.owner || '未分配';
+            if (!ownerMap[owner]) ownerMap[owner] = { budget: 0, actual: 0 };
+            for (let m = 1; m <= 12; m++) {
+                ownerMap[owner].budget += row.monthly[`month_${m}`] || 0;
+            }
+        });
+        actualsData.forEach(row => {
+            const owner = row.owner || '未分配';
+            if (!ownerMap[owner]) ownerMap[owner] = { budget: 0, actual: 0 };
+            for (let m = 1; m <= 12; m++) {
+                ownerMap[owner].actual += row.monthly[`month_${m}`] || 0;
+            }
+        });
+
+        html += '<div class="summary-section">';
+        html += '<div class="section-title"><span class="icon">&#9673;</span> 各负责人预算使用进度</div>';
+        html += '<div class="ring-grid">';
+
+        const owners = Object.keys(ownerMap).sort((a, b) => ownerMap[b].budget - ownerMap[a].budget);
+        const R = 52, SW = 9, C = 2 * Math.PI * R;
+
+        owners.forEach(owner => {
+            const o = ownerMap[owner];
+            const pct = o.budget > 0 ? (o.actual / o.budget * 100) : 0;
+            const color = pct > 90 ? '#ff4d4f' : pct > 60 ? '#faad14' : '#52c41a';
+            const offset = C - (Math.min(pct, 100) / 100) * C;
+            const remain = o.budget - o.actual;
+
+            html += `<div class="ring-item">
+                <div class="ring-svg-wrap">
+                    <svg viewBox="0 0 128 128" width="128" height="128">
+                        <circle cx="64" cy="64" r="${R}" fill="none" stroke="#f0f0f0" stroke-width="${SW}"/>
+                        <circle cx="64" cy="64" r="${R}" fill="none" stroke="${color}" stroke-width="${SW}"
+                            stroke-dasharray="${C}" stroke-dashoffset="${offset}"
+                            stroke-linecap="round" transform="rotate(-90 64 64)"
+                            style="transition: stroke-dashoffset 0.6s ease"/>
+                        <text x="64" y="58" text-anchor="middle" font-size="20" font-weight="700" fill="${color}">${pct.toFixed(1)}</text>
+                        <text x="64" y="76" text-anchor="middle" font-size="11" fill="#999">%</text>
+                    </svg>
+                </div>
+                <div class="ring-name">${this._esc(owner)}</div>
+                <div class="ring-stats">
+                    <span>预算 ${this._fmt(o.budget)}</span>
+                    <span>实际 ${this._fmt(o.actual)}</span>
+                    <span>剩余 ${this._fmt(remain)}</span>
                 </div>
             </div>`;
         });
