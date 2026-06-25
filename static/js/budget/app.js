@@ -177,8 +177,9 @@ const BudgetApp = {
         });
 
         const totals = this._calcTotals('budget');
-        const totalCells = totals.months.map(v => `<td class="total-col">${this._fmt(v)}</td>`).join('');
-        rows.push(`<tr class="total-row" style="background:#f0f5ff;border-top:2px solid #1890ff"><td class="base-col" colspan="6" style="font-weight:700">合计</td>${totalCells}<td class="total total-col" style="font-weight:700">${this._fmt(totals.grand)}</td></tr>`);
+        const totalCells = [];
+        for (let m = 1; m <= 12; m++) totalCells.push(`<td class="total-col">${this._fmt(totals.months[m])}</td>`);
+        rows.push(`<tr class="total-row" style="background:#f0f5ff;border-top:2px solid #1890ff"><td class="base-col" colspan="6" style="font-weight:700">合计</td>${totalCells.join('')}<td class="total total-col" style="font-weight:700">${this._fmt(totals.grand)}</td></tr>`);
 
         tbody.innerHTML = rows.join('');
 
@@ -346,8 +347,9 @@ const BudgetApp = {
         });
 
         const totals = this._calcTotals('actual');
-        const totalCells = totals.months.map(v => `<td class="total-col">${this._fmt(v)}</td>`).join('');
-        rows.push(`<tr class="total-row" style="background:#f0f5ff;border-top:2px solid #1890ff"><td class="base-col" colspan="6" style="font-weight:700">合计</td>${totalCells}<td class="total total-col" style="font-weight:700">${this._fmt(totals.grand)}</td></tr>`);
+        const totalCells = [];
+        for (let m = 1; m <= 12; m++) totalCells.push(`<td class="total-col">${this._fmt(totals.months[m])}</td>`);
+        rows.push(`<tr class="total-row" style="background:#f0f5ff;border-top:2px solid #1890ff"><td class="base-col" colspan="6" style="font-weight:700">合计</td>${totalCells.join('')}<td class="total total-col" style="font-weight:700">${this._fmt(totals.grand)}</td></tr>`);
 
         tbody.innerHTML = rows.join('');
 
