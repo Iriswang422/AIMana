@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string, re
 import pandas as pd
 import os
 from datetime import datetime
+from db import init_db
 
 app = Flask(__name__)
 
@@ -13,6 +14,8 @@ app.register_blueprint(report_bp)
 # 注册预算Blueprint
 from routes.budget import budget_bp
 app.register_blueprint(budget_bp)
+
+init_db()
 
 UPLOAD_FOLDER = 'uploads'
 DOWNLOAD_FOLDER = 'downloads'
