@@ -5,284 +5,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI体验中心预算追踪</title>
     <link rel="stylesheet" href="/static/css/budget.css">
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 </head>
 <body>
     <div class="budget-container">
-        <!-- 头部 -->
         <header class="budget-header">
-            <div class="header-left">
-                <h1>AI体验中心预算追踪</h1>
-            </div>
-            <div class="header-right">
-                <select id="month-filter" class="filter-select">
-                    <option value="">全部月份</option>
-                    <option value="2026-01">1月</option>
-                    <option value="2026-02">2月</option>
-                    <option value="2026-03">3月</option>
-                    <option value="2026-04">4月</option>
-                    <option value="2026-05">5月</option>
-                    <option value="2026-06">6月</option>
-                    <option value="2026-07">7月</option>
-                    <option value="2026-08">8月</option>
-                    <option value="2026-09">9月</option>
-                    <option value="2026-10">10月</option>
-                    <option value="2026-11">11月</option>
-                    <option value="2026-12">12月</option>
+            <h1>AI体验中心预算追踪</h1>
+            <div class="header-actions">
+                <select id="filter-project" class="filter-select">
+                    <option value="">全部项目</option>
                 </select>
-                <button id="init-sample-btn" class="btn btn-secondary">初始化FY26数据</button>
-                <button id="refresh-btn" class="btn btn-icon" title="刷新">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
-                        <path d="M21 3v5h-5"/>
-                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
-                        <path d="M3 21v-5h5"/>
-                    </svg>
-                </button>
+                <select id="filter-tag" class="filter-select">
+                    <option value="">全部Tag</option>
+                </select>
+                <select id="filter-owner" class="filter-select">
+                    <option value="">全部负责人</option>
+                </select>
+                <button id="import-btn" class="btn btn-primary">导入Excel</button>
+                <button id="refresh-btn" class="btn btn-icon" title="刷新">&#x21bb;</button>
             </div>
         </header>
 
-        <!-- 标签页导航 -->
         <nav class="tab-nav">
-            <button class="tab-btn active" data-tab="budget-edit">FY26 预算</button>
-            <button class="tab-btn" data-tab="actuals">实际成本</button>
-            <button class="tab-btn" data-tab="analysis">预实对比</button>
-            <button class="tab-btn" data-tab="trend">月度趋势</button>
-            <button class="tab-btn" data-tab="settings">设置</button>
+            <button class="tab-btn active" data-tab="budget">预算数</button>
+            <button class="tab-btn" data-tab="comparison">预实对比</button>
+            <button class="tab-btn" data-tab="actuals">实际数</button>
         </nav>
 
-        <!-- 内容区 -->
+        <div id="risk-summary" class="risk-summary" style="display:none;"></div>
+
         <main class="tab-content">
-            <!-- 预算编辑 -->
-            <div id="budget-edit-tab" class="tab-pane active">
-                <div class="section-header">
-                    <h2>预算编辑面板</h2>
-                    <div class="header-actions">
-                        <a href="/budget/import" class="btn btn-secondary btn-sm" style="text-decoration:none;display:inline-block;">📥 导入 Excel</a>
-                        <button id="add-owner-btn" class="btn btn-primary btn-sm">+ 添加负责人</button>
-                    </div>
-                </div>
-
-                <!-- Excel 导入区域 -->
-                <div id="import-section" style="display:none; margin-bottom:20px; padding:20px; background:#f9f9f9; border-radius:8px;">
-                    <h3>批量导入预算数据</h3>
-                    <p style="font-size:14px; color:#666; margin:10px 0;">
-                        Excel 格式：负责人 | 板块 | 明细名称 | 原预算 | 当前预算
-                    </p>
-                    <div class="upload-area">
-                        <input type="file" id="budget-import-file" accept=".xlsx,.xls">
-                        <button id="preview-import-btn" class="btn btn-secondary" onclick="BudgetApp.handleBudgetImportPreview()">预览</button>
-                        <button id="confirm-import-btn" class="btn btn-primary" onclick="BudgetApp.handleBudgetImport()">确认导入</button>
-                        <button class="btn" onclick="document.getElementById('import-section').style.display='none'">取消</button>
-                    </div>
-                    <div id="import-status" style="margin-top:10px;"></div>
-                    <div id="import-preview-modal" class="modal" style="display:none;">
-                        <div class="modal-content">
-                            <h3>预览导入数据</h3>
-                            <div id="import-preview-content"></div>
-                            <button class="btn" onclick="document.getElementById('import-preview-modal').style.display='none'">关闭</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="budget-tree" class="budget-tree">
-                    <!-- 动态加载三层结构 -->
+            <div id="budget-tab" class="tab-pane active">
+                <div class="table-scroll">
+                    <table id="budget-table" class="excel-table">
+                        <thead><tr></tr></thead>
+                        <tbody></tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- 实际成本 -->
+            <div id="comparison-tab" class="tab-pane">
+                <div class="table-scroll">
+                    <table id="comparison-table" class="excel-table">
+                        <thead><tr></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
             <div id="actuals-tab" class="tab-pane">
-                <div class="section-header">
-                    <h2>实际成本上传</h2>
-                </div>
-
-                <div class="upload-section">
-                    <div class="upload-instructions">
-                        <h3>Excel 格式说明</h3>
-                        <table class="info-table">
-                            <thead>
-                                <tr>
-                                    <th>负责人</th>
-                                    <th>板块</th>
-                                    <th>明细名称</th>
-                                    <th>月份</th>
-                                    <th>实际金额</th>
-                                    <th>变动理由</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td>张三</td>
-                                    <td>人力成本</td>
-                                    <td>工资</td>
-                                    <td>2026-01</td>
-                                    <td>95000</td>
-                                    <td>正常发放</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <p style="font-size:12px; color:#666; margin-top:10px;">
-                            月份格式：2026-01, 2026-02, ... 2026-12
-                        </p>
-                    </div>
-
-                    <div class="upload-area">
-                        <input type="file" id="actuals-upload-file" accept=".xlsx,.xls">
-                        <button id="preview-actuals-btn" class="btn btn-secondary" onclick="BudgetApp.handleActualsPreview()">预览数据</button>
-                        <button id="upload-actuals-btn" class="btn btn-primary" onclick="BudgetApp.handleActualsUpload()">确认上传</button>
-                    </div>
-
-                    <div id="actuals-upload-status" style="margin-top:15px;"></div>
-
-                    <div id="actuals-preview-modal" class="modal" style="display:none;">
-                        <div class="modal-content" style="max-width:900px;">
-                            <h3>预览实际数数据</h3>
-                            <div id="actuals-preview-content"></div>
-                            <button class="btn" onclick="document.getElementById('actuals-preview-modal').style.display='none'">关闭</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section" style="margin-top:30px;">
-                    <h3>已上传记录</h3>
-                    <div class="table-container">
-                        <table id="actuals-table" class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>负责人</th>
-                                    <th>板块</th>
-                                    <th>明细</th>
-                                    <th>月份</th>
-                                    <th>实际金额</th>
-                                    <th>变动理由</th>
-                                    <th>风险</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 预实对比 -->
-            <div id="analysis-tab" class="tab-pane">
-                <div class="section-header">
-                    <h2>预实对比分析</h2>
-                    <div class="risk-filter">
-                        <button class="risk-btn active" data-level="">全部</button>
-                        <button class="risk-btn risk-p0" data-level="P0">P0 超支</button>
-                        <button class="risk-btn risk-p1" data-level="P1">P1 未用满</button>
-                        <button class="risk-btn risk-p2" data-level="P2">P2 未使用</button>
-                        <button class="risk-btn risk-p3" data-level="P3">P3 预算内</button>
-                    </div>
-                </div>
-
-                <div class="risk-summary" id="risk-summary">
-                    <!-- 风险汇总卡片 -->
-                </div>
-
-                <div class="table-container">
-                    <table id="analysis-table" class="data-table">
-                        <thead>
-                            <tr>
-                                <th>负责人</th>
-                                <th>板块</th>
-                                <th>明细</th>
-                                <th>预算</th>
-                                <th>实际</th>
-                                <th>差异</th>
-                                <th>差异率</th>
-                                <th>风险</th>
-                                <th>变动理由</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 月度趋势 -->
-            <div id="trend-tab" class="tab-pane">
-                <div class="section-header">
-                    <h2>月度趋势</h2>
-                    <div class="view-toggle">
-                        <button class="toggle-btn active" data-view="owner">按负责人</button>
-                        <button class="toggle-btn" data-view="category">按板块</button>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <div id="trend-chart" class="chart"></div>
-                </div>
-                <div class="chart-container">
-                    <h3>预实对比趋势</h3>
-                    <div id="comparison-chart" class="chart"></div>
-                </div>
-            </div>
-
-            <!-- 设置 -->
-            <div id="settings-tab" class="tab-pane">
-                <div class="section">
-                    <h2>上传实际数</h2>
-                    <div class="upload-area">
-                        <input type="file" id="actuals-file" accept=".xlsx,.xls">
-                        <button id="preview-btn" class="btn btn-secondary">预览</button>
-                        <button id="upload-btn" class="btn btn-primary">上传并匹配</button>
-                    </div>
-                    <div id="upload-status"></div>
-                    <div id="preview-modal" class="modal" style="display:none;">
-                        <div class="modal-content">
-                            <h3>预览数据</h3>
-                            <div id="preview-content"></div>
-                            <button class="btn" onclick="document.getElementById('preview-modal').style.display='none'">关闭</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h2>风险规则配置</h2>
-                    <div id="risk-rules-editor">
-                        <!-- 动态加载风险规则 -->
-                    </div>
-                    <button id="save-rules-btn" class="btn btn-primary">保存规则</button>
-                </div>
-
-                <div class="section">
-                    <h2>权限管理</h2>
-                    <div class="permission-form">
-                        <input type="text" id="perm-user" placeholder="飞书userId">
-                        <select id="perm-role">
-                            <option value="viewer">查看者</option>
-                            <option value="editor">编辑者</option>
-                            <option value="admin">管理员</option>
-                        </select>
-                        <input type="text" id="perm-group" placeholder="飞书群（可选）">
-                        <button id="add-perm-btn" class="btn btn-primary">添加权限</button>
-                    </div>
-                    <table id="permissions-table" class="data-table">
-                        <thead>
-                            <tr>
-                                <th>用户ID</th>
-                                <th>角色</th>
-                                <th>飞书群</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-
-                <div class="section">
-                    <h2>变更记录</h2>
-                    <table id="change-log-table" class="data-table">
-                        <thead>
-                            <tr>
-                                <th>时间</th>
-                                <th>项目</th>
-                                <th>原预算</th>
-                                <th>新预算</th>
-                                <th>差额</th>
-                                <th>操作人</th>
-                            </tr>
-                        </thead>
+                <div class="table-scroll">
+                    <table id="actuals-table" class="excel-table">
+                        <thead><tr></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -290,39 +63,30 @@
         </main>
     </div>
 
-    <!-- 编辑预算弹窗 -->
-    <div id="edit-budget-modal" class="modal" style="display:none;">
+    <div id="import-modal" class="modal" style="display:none;">
         <div class="modal-content">
-            <h3>编辑预算</h3>
-            <div class="form-group">
-                <label>项目名称</label>
-                <input type="text" id="edit-item-name" readonly>
-            </div>
-            <div class="form-group">
-                <label>原预算</label>
-                <input type="number" id="edit-original-budget" readonly>
-            </div>
-            <div class="form-group">
-                <label>当前预算</label>
-                <input type="number" id="edit-current-budget">
-            </div>
-            <div class="form-group">
-                <label>操作人</label>
-                <input type="text" id="edit-changed-by" placeholder="你的姓名">
-            </div>
+            <h3>导入预算Excel</h3>
+            <p class="modal-hint">支持3页签格式：预算数 / 预实对比 / 实际数</p>
+            <input type="file" id="import-file" accept=".xlsx,.xls">
+            <div id="import-preview"></div>
+            <div id="import-status"></div>
             <div class="modal-actions">
-                <button id="save-budget-btn" class="btn btn-primary">保存</button>
-                <button class="btn" onclick="document.getElementById('edit-budget-modal').style.display='none'">取消</button>
+                <button id="preview-btn" class="btn btn-secondary">预览</button>
+                <button id="confirm-import-btn" class="btn btn-primary">确认导入</button>
+                <button class="btn" onclick="document.getElementById('import-modal').style.display='none'">取消</button>
             </div>
         </div>
     </div>
 
-    <!-- 变更记录弹窗 -->
-    <div id="change-log-modal" class="modal" style="display:none;">
+    <div id="reason-modal" class="modal" style="display:none;">
         <div class="modal-content">
-            <h3>变更记录</h3>
-            <div id="change-log-content"></div>
-            <button class="btn" onclick="document.getElementById('change-log-modal').style.display='none'">关闭</button>
+            <h3>编辑变动理由</h3>
+            <p id="reason-context"></p>
+            <textarea id="reason-input" rows="3" placeholder="请输入变动理由..."></textarea>
+            <div class="modal-actions">
+                <button id="save-reason-btn" class="btn btn-primary">保存</button>
+                <button class="btn" onclick="document.getElementById('reason-modal').style.display='none'">取消</button>
+            </div>
         </div>
     </div>
 
