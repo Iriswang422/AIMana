@@ -1,0 +1,40 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database (will be created at runtime)
+database.db
+
+# Uploads
+uploads/
+downloads/
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Deploy
+deploy_to_pythonanywhere.py
+*.bat
+*.ps1
