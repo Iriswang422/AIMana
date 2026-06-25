@@ -104,28 +104,7 @@ class BudgetExcelParser:
 
     def _parse_comparison_sheet(self, df, item_map, result):
         for _, row in df.iterrows():
-            key = self._ensure_item(row, item_map)
-            if key is None:
-                continue
-            for m in range(1, 13):
-                budget_col = f'{m}月预算'
-                actual_col = f'{m}月实际'
-                if budget_col in df.columns:
-                    amount = self._to_float(row.get(budget_col))
-                    if amount != 0:
-                        result['budget_monthly'].append({
-                            'key': key,
-                            'month': m,
-                            'amount': amount,
-                        })
-                if actual_col in df.columns:
-                    amount = self._to_float(row.get(actual_col))
-                    if amount != 0:
-                        result['actual_monthly'].append({
-                            'key': key,
-                            'month': m,
-                            'amount': amount,
-                        })
+            self._ensure_item(row, item_map)
 
     def _parse_actuals_sheet(self, df, item_map, result):
         for _, row in df.iterrows():
