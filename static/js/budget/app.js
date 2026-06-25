@@ -1,4 +1,4 @@
-// 预算追踪主控制器
+﻿// 预算追踪主控制器
 const BudgetApp = {
     currentMonth: null,
     currentRiskLevel: null,
@@ -619,7 +619,7 @@ const BudgetApp = {
         });
 
         // 月份筛选
-        document.getElementById('month-filter').addEventListener('change', (e) => {
+        const mf = document.getElementById('month-filter'); if (mf) mf.addEventListener('change', (e) => {
             this.currentMonth = e.target.value || null;
             this.loadAnalysis();
         });
@@ -644,68 +644,83 @@ const BudgetApp = {
         });
 
         // 刷新按钮
-        document.getElementById('refresh-btn').addEventListener('click', () => {
+        const rb = document.getElementById('refresh-btn'); if (rb) rb.addEventListener('click', () => {
             this.loadTree();
             this.loadAnalysis();
             this.loadRiskSummary();
         });
 
         // 初始化示例数据
-        document.getElementById('init-sample-btn').addEventListener('click', () => {
+        const isb = document.getElementById('init-sample-btn'); if (isb) isb.addEventListener('click', () => {
             this.initSampleData();
         });
 
         // 添加负责人
-        document.getElementById('add-owner-btn').addEventListener('click', () => {
+        const aob = document.getElementById('add-owner-btn'); if (aob) aob.addEventListener('click', () => {
             this.addOwnerPrompt();
         });
 
         // 编辑预算
-        document.getElementById('save-budget-btn').addEventListener('click', () => {
+        const sbb = document.getElementById('save-budget-btn'); if (sbb) sbb.addEventListener('click', () => {
             this.saveBudget();
         });
 
         // 上传实际数
-        document.getElementById('upload-btn').addEventListener('click', () => {
+        const ub = document.getElementById('upload-btn'); if (ub) ub.addEventListener('click', () => {
             this.handleUpload();
         });
 
         // 预览上传
-        document.getElementById('preview-btn').addEventListener('click', () => {
+        const pb = document.getElementById('preview-btn'); if (pb) pb.addEventListener('click', () => {
             this.handlePreview();
         });
 
         // 保存风险规则
-        document.getElementById('save-rules-btn').addEventListener('click', () => {
+        const srb = document.getElementById('save-rules-btn'); if (srb) srb.addEventListener('click', () => {
             this.saveRiskRules();
         });
 
         // 添加权限
-        document.getElementById('add-perm-btn').addEventListener('click', () => {
+        const apb = document.getElementById('add-perm-btn'); if (apb) apb.addEventListener('click', () => {
             this.addPermission();
         });
 
         // Excel 导入
-        document.getElementById('import-excel-btn').addEventListener('click', () => {
-            document.getElementById('import-section').style.display = 'block';
-        });
+        const importBtn = document.getElementById('import-excel-btn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => {
+                document.getElementById('import-section').style.display = 'block';
+            });
+        }
 
-        document.getElementById('preview-import-btn').addEventListener('click', () => {
-            this.handleBudgetImportPreview();
-        });
+        const previewImportBtn = document.getElementById('preview-import-btn');
+        if (previewImportBtn) {
+            previewImportBtn.addEventListener('click', () => {
+                this.handleBudgetImportPreview();
+            });
+        }
 
-        document.getElementById('confirm-import-btn').addEventListener('click', () => {
-            this.handleBudgetImport();
-        });
+        const confirmImportBtn = document.getElementById('confirm-import-btn');
+        if (confirmImportBtn) {
+            confirmImportBtn.addEventListener('click', () => {
+                this.handleBudgetImport();
+            });
+        }
 
         // 实际成本上传
-        document.getElementById('preview-actuals-btn').addEventListener('click', () => {
-            this.handleActualsPreview();
-        });
+        const previewActualsBtn = document.getElementById('preview-actuals-btn');
+        if (previewActualsBtn) {
+            previewActualsBtn.addEventListener('click', () => {
+                this.handleActualsPreview();
+            });
+        }
 
-        document.getElementById('upload-actuals-btn').addEventListener('click', () => {
-            this.handleActualsUpload();
-        });
+        const uploadActualsBtn = document.getElementById('upload-actuals-btn');
+        if (uploadActualsBtn) {
+            uploadActualsBtn.addEventListener('click', () => {
+                this.handleActualsUpload();
+            });
+        }
     },
 
     // ===== Excel 批量导入 =====
@@ -955,3 +970,4 @@ const BudgetApp = {
 document.addEventListener('DOMContentLoaded', () => {
     BudgetApp.init();
 });
+
