@@ -1,6 +1,6 @@
 const BudgetApp = {
     currentTab: 'budget',
-    filters: { project: '', tag: '', owner: '' },
+    filters: { project: '', tag: '', owner: '', month: '' },
     data: [],
 
     init() {
@@ -22,7 +22,7 @@ const BudgetApp = {
         const refreshBtn = document.getElementById('refresh-btn');
         if (refreshBtn) refreshBtn.addEventListener('click', () => this.loadTabData());
 
-        ['project', 'tag', 'owner'].forEach(f => {
+        ['project', 'tag', 'owner', 'month'].forEach(f => {
             const el = document.getElementById(`filter-${f}`);
             if (el) el.addEventListener('change', () => {
                 this.filters[f] = el.value;
@@ -36,8 +36,8 @@ const BudgetApp = {
         const confirmBtn = document.getElementById('confirm-import-btn');
         if (confirmBtn) confirmBtn.addEventListener('click', () => this.handleImport());
 
-        const saveReasonBtn = document.getElementById('save-reason-btn');
-        if (saveReasonBtn) saveReasonBtn.addEventListener('click', () => this.saveReason());
+        const saveNoteBtn = document.getElementById('save-note-btn');
+        if (saveNoteBtn) saveNoteBtn.addEventListener('click', () => this.saveVarianceNote());
     },
 
     switchTab(tab) {
@@ -45,6 +45,7 @@ const BudgetApp = {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `${tab}-tab`));
         document.getElementById('risk-summary').style.display = tab === 'comparison' ? 'flex' : 'none';
+        document.getElementById('risk-legend').style.display = tab === 'comparison' ? 'flex' : 'none';
         this.loadTabData();
     },
 
@@ -72,23 +73,31 @@ const BudgetApp = {
         sel.value = current;
     },
 
-    async loadTabData() {
+    _getParams() {
         const params = {};
         if (this.filters.project) params.project = this.filters.project;
         if (this.filters.tag) params.tag = this.filters.tag;
         if (this.filters.owner) params.owner = this.filters.owner;
+        if (this.filters.month) params.month = this.filters.month;
+        return params;
+    },
+
+    async loadTabData() {
+        const params = this._getParams();
 
         if (this.currentTab === 'budget') {
             const res = await BudgetAPI.getBudgetData(params);
             if (res.success) {
                 this.data = res.data;
                 this.renderBudgetTable();
+                this._updateBudgetSummary();
             }
         } else if (this.currentTab === 'comparison') {
             const res = await BudgetAPI.getComparisonData(params);
             if (res.success) {
                 this.data = res.data;
                 this.renderComparisonTable();
+                this._updateComparisonSummary();
                 this.loadRiskSummary();
             }
         } else if (this.currentTab === 'actuals') {
@@ -96,21 +105,51 @@ const BudgetApp = {
             if (res.success) {
                 this.data = res.data;
                 this.renderActualsTable();
+                this._updateActualsSummary();
             }
         }
     },
 
     async loadRiskSummary() {
-        const res = await BudgetAPI.getRiskSummary();
+        const params = {};
+        if (this.filters.month) params.month = this.filters.month;
+        const qs = new URLSearchParams(params).toString();
+        const res = await fetch(`/api/budget/risk-summary${qs ? '?' + qs : ''}`).then(r => r.json());
         if (!res.success) return;
         const d = res.data;
-        const el = document.getElementById('risk-summary');
-        el.innerHTML = `
+        document.getElementById('risk-summary').innerHTML = `
             <div class="risk-card risk-p0"><span class="risk-label">P0 超支</span><span class="risk-count">${d.P0 || 0}</span></div>
             <div class="risk-card risk-p1"><span class="risk-label">P1 未用满</span><span class="risk-count">${d.P1 || 0}</span></div>
             <div class="risk-card risk-p2"><span class="risk-label">P2 未使用</span><span class="risk-count">${d.P2 || 0}</span></div>
             <div class="risk-card risk-p3"><span class="risk-label">P3 预算内</span><span class="risk-count">${d.P3 || 0}</span></div>
         `;
+    },
+
+    _updateBudgetSummary() {
+        const total = this.data.reduce((s, r) => s + (r.total || 0), 0);
+        document.getElementById('budget-summary').innerHTML =
+            `<span>共 <strong>${this.data.length}</strong> 条明细</span>
+             <span>合计预算: <strong class="total-val">${this._fmt(total)}</strong></span>`;
+    },
+
+    _updateComparisonSummary() {
+        const totalB = this.data.reduce((s, r) => s + (r.total_budget || 0), 0);
+        const totalA = this.data.reduce((s, r) => s + (r.total_actual || 0), 0);
+        const diff = totalA - totalB;
+        const diffClass = diff > 0 ? 'risk-p0' : diff < 0 ? 'neg' : '';
+        const monthLabel = this.filters.month ? `${this.filters.month}月` : '全年';
+        document.getElementById('comparison-summary').innerHTML =
+            `<span>${monthLabel} | 共 <strong>${this.data.length}</strong> 条</span>
+             <span>合计预算: <strong>${this._fmt(totalB)}</strong></span>
+             <span>合计实际: <strong>${this._fmt(totalA)}</strong></span>
+             <span>合计差异: <strong class="${diffClass}">${this._fmt(diff)}</strong></span>`;
+    },
+
+    _updateActualsSummary() {
+        const total = this.data.reduce((s, r) => s + (r.total || 0), 0);
+        document.getElementById('actuals-summary').innerHTML =
+            `<span>共 <strong>${this.data.length}</strong> 条明细</span>
+             <span>合计实际: <strong class="total-val">${this._fmt(total)}</strong></span>`;
     },
 
     // ===== Table Rendering =====
@@ -119,26 +158,28 @@ const BudgetApp = {
         const table = document.getElementById('budget-table');
         const thead = table.querySelector('thead tr');
         const tbody = table.querySelector('tbody');
+        const tfoot = table.querySelector('tfoot');
 
         const baseHeaders = ['项目', 'Tag', '业务场景', '供应商', '明细', '负责人'];
         const monthHeaders = [];
-        for (let m = 1; m <= 12; m++) monthHeaders.push(`${m}月预算`);
+        for (let m = 1; m <= 12; m++) monthHeaders.push(`${m}月`);
         const allHeaders = [...baseHeaders, ...monthHeaders, '合计'];
-
         thead.innerHTML = allHeaders.map(h => `<th>${h}</th>`).join('');
 
         tbody.innerHTML = this.data.map(row => {
-            const base = [
-                this._esc(row.project), this._esc(row.tag), this._esc(row.business_scene),
-                this._esc(row.vendor), this._esc(row.detail), this._esc(row.owner)
-            ];
+            const base = [row.project, row.tag, row.business_scene, row.vendor, row.detail, row.owner]
+                .map(v => `<td class="base-col">${this._esc(v)}</td>`).join('');
             const months = [];
             for (let m = 1; m <= 12; m++) {
                 const val = row.monthly[`month_${m}`] || 0;
-                months.push(`<td class="editable" data-item-id="${row.id}" data-month="${m}" data-type="budget">${this._fmt(val)}</td>`);
+                const highlight = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
+                months.push(`<td class="editable${highlight}" data-item-id="${row.id}" data-month="${m}" data-type="budget">${this._fmt(val)}</td>`);
             }
-            return `<tr>${base.map(b => `<td class="base-col">${b}</td>`).join('')}${months.join('')}<td class="total total-col">${this._fmt(row.total)}</td></tr>`;
+            return `<tr>${base}${months.join('')}<td class="total total-col">${this._fmt(row.total)}</td></tr>`;
         }).join('');
+
+        const totals = this._calcTotals('budget');
+        tfoot.innerHTML = `<tr class="total-row"><td class="base-col" colspan="6">合计</td>${totals.months.map(v => `<td class="total-col">${this._fmt(v)}</td>`).join('')}<td class="total total-col">${this._fmt(totals.grand)}</td></tr>`;
 
         tbody.querySelectorAll('.editable').forEach(td => {
             td.addEventListener('click', () => this.editCell(td));
@@ -149,40 +190,151 @@ const BudgetApp = {
         const table = document.getElementById('comparison-table');
         const thead = table.querySelector('thead');
         const tbody = table.querySelector('tbody');
+        const tfoot = table.querySelector('tfoot');
 
-        // Two-row header: base cols + month groups (预算/实际/差异)
-        let headerRow1 = '<tr><th rowspan="2">项目</th><th rowspan="2">Tag</th><th rowspan="2">业务场景</th><th rowspan="2">负责人</th>';
-        let headerRow2 = '<tr>';
+        const monthHeaders1 = '<tr><th rowspan="2" class="base-col">项目</th><th rowspan="2" class="base-col">Tag</th><th rowspan="2" class="base-col">业务场景</th><th rowspan="2" class="base-col">负责人</th>';
+        const monthHeaders2 = '<tr>';
         for (let m = 1; m <= 12; m++) {
-            headerRow1 += `<th colspan="3">${m}月</th>`;
-            headerRow2 += '<th>预算</th><th>实际</th><th>差异</th>';
+            const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
+            monthHeaders1 += `<th colspan="4" class="${hl}">${m}月</th>`;
+            monthHeaders2 += `<th class="${hl}">预算</th><th class="${hl}">实际</th><th class="${hl}">差异</th><th class="${hl}">解释</th>`;
         }
-        headerRow1 += '<th rowspan="2">合计差异</th></tr>';
-        headerRow2 += '</tr>';
-        thead.innerHTML = headerRow1 + headerRow2;
+        monthHeaders1 += '<th rowspan="2">合计差异</th></tr>';
+        monthHeaders2 += '</tr>';
+        thead.innerHTML = monthHeaders1 + monthHeaders2;
 
         tbody.innerHTML = this.data.map(row => {
-            const base = [
-                this._esc(row.project), this._esc(row.tag),
-                this._esc(row.business_scene), this._esc(row.owner)
-            ];
+            const base = [row.project, row.tag, row.business_scene, row.owner]
+                .map(v => `<td class="base-col">${this._esc(v)}</td>`).join('');
             const months = [];
             for (let m = 1; m <= 12; m++) {
                 const md = row.monthly[`month_${m}`] || {};
                 const riskClass = md.risk ? `risk-${md.risk.toLowerCase()}` : '';
-                const hasReason = md.reason ? ' has-reason' : '';
+                const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
+                const noteIcon = md.note ? ' has-note' : '';
                 months.push(
-                    `<td>${this._fmt(md.budget)}</td>`,
-                    `<td class="editable${hasReason}" data-item-id="${row.id}" data-month="${m}" data-type="actual" title="${md.reason ? '点击查看/编辑理由' : '点击编辑'}">${this._fmt(md.actual)}</td>`,
-                    `<td class="${riskClass}">${this._fmt(md.diff)}</td>`
+                    `<td class="${hl}">${this._fmt(md.budget)}</td>`,
+                    `<td class="editable${hl}" data-item-id="${row.id}" data-month="${m}" data-type="actual">${this._fmt(md.actual)}</td>`,
+                    `<td class="${riskClass}${hl}">${this._fmt(md.diff)}</td>`,
+                    `<td class="note-cell${noteIcon}${hl}" data-item-id="${row.id}" data-month="${m}" title="${this._esc(md.note) || '点击添加差异解释'}">${md.note ? this._truncate(md.note, 20) : '<span class="add-note">+</span>'}</td>`
                 );
             }
             const diffClass = row.total_diff > 0 ? 'risk-p0' : (row.total_diff < 0 ? 'risk-p2' : '');
-            return `<tr>${base.map(b => `<td class="base-col">${b}</td>`).join('')}${months.join('')}<td class="${diffClass} total-col">${this._fmt(row.total_diff)}</td></tr>`;
+            return `<tr>${base}${months.join('')}<td class="${diffClass} total-col">${this._fmt(row.total_diff)}</td></tr>`;
         }).join('');
+
+        const totals = this._compTotals();
+        let tfootMonths = '';
+        for (let m = 1; m <= 12; m++) {
+            const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
+            tfootMonths += `<td class="${hl}">${this._fmt(totals.budgets[m])}</td><td class="${hl}">${this._fmt(totals.actuals[m])}</td><td class="${hl}">${this._fmt(totals.diffs[m])}</td><td class="${hl}"></td>`;
+        }
+        const totalDiffClass = totals.grandDiff > 0 ? 'risk-p0' : (totals.grandDiff < 0 ? 'risk-p2' : '');
+        tfoot.innerHTML = `<tr class="total-row"><td class="base-col" colspan="4">合计</td>${tfootMonths}<td class="${totalDiffClass} total-col">${this._fmt(totals.grandDiff)}</td></tr>`;
 
         tbody.querySelectorAll('.editable').forEach(td => {
             td.addEventListener('click', () => this.editActualCell(td));
+        });
+        tbody.querySelectorAll('.note-cell').forEach(td => {
+            td.addEventListener('click', () => this.showNoteModal(td));
+        });
+    },
+
+    renderActualsTable() {
+        const table = document.getElementById('actuals-table');
+        const thead = table.querySelector('thead tr');
+        const tbody = table.querySelector('tbody');
+        const tfoot = table.querySelector('tfoot');
+
+        const baseHeaders = ['项目', 'Tag', '业务场景', '供应商', '明细', '负责人'];
+        const monthHeaders = [];
+        for (let m = 1; m <= 12; m++) monthHeaders.push(`${m}月`);
+        const allHeaders = [...baseHeaders, ...monthHeaders, '合计'];
+        thead.innerHTML = allHeaders.map(h => `<th>${h}</th>`).join('');
+
+        tbody.innerHTML = this.data.map(row => {
+            const base = [row.project, row.tag, row.business_scene, row.vendor, row.detail, row.owner]
+                .map(v => `<td class="base-col">${this._esc(v)}</td>`).join('');
+            const months = [];
+            for (let m = 1; m <= 12; m++) {
+                const val = row.monthly[`month_${m}`] || 0;
+                const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
+                months.push(`<td class="editable${hl}" data-item-id="${row.id}" data-month="${m}" data-type="actual">${this._fmt(val)}</td>`);
+            }
+            return `<tr>${base}${months.join('')}<td class="total total-col">${this._fmt(row.total)}</td></tr>`;
+        }).join('');
+
+        const totals = this._calcTotals('actual');
+        tfoot.innerHTML = `<tr class="total-row"><td class="base-col" colspan="6">合计</td>${totals.months.map(v => `<td class="total-col">${this._fmt(v)}</td>`).join('')}<td class="total total-col">${this._fmt(totals.grand)}</td></tr>`;
+
+        tbody.querySelectorAll('.editable').forEach(td => {
+            td.addEventListener('click', () => this.editCell(td));
+        });
+    },
+
+    _calcTotals(type) {
+        const months = {};
+        for (let m = 1; m <= 12; m++) months[m] = 0;
+        let grand = 0;
+        this.data.forEach(row => {
+            for (let m = 1; m <= 12; m++) {
+                const val = row.monthly[`month_${m}`] || 0;
+                months[m] += val;
+                grand += val;
+            }
+        });
+        return { months, grand };
+    },
+
+    _compTotals() {
+        const budgets = {}, actuals = {}, diffs = {};
+        for (let m = 1; m <= 12; m++) { budgets[m] = 0; actuals[m] = 0; diffs[m] = 0; }
+        let grandBudget = 0, grandActual = 0;
+        this.data.forEach(row => {
+            for (let m = 1; m <= 12; m++) {
+                const md = row.monthly[`month_${m}`] || {};
+                budgets[m] += md.budget || 0;
+                actuals[m] += md.actual || 0;
+                diffs[m] += md.diff || 0;
+                grandBudget += md.budget || 0;
+                grandActual += md.actual || 0;
+            }
+        });
+        return { budgets, actuals, diffs, grandBudget, grandActual, grandDiff: grandActual - grandBudget };
+    },
+
+    // ===== Cell Editing =====
+
+    editCell(td) {
+        const itemId = td.dataset.itemId;
+        const month = parseInt(td.dataset.month);
+        const type = td.dataset.type;
+        const oldVal = this._parseNum(td.textContent);
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = oldVal;
+        input.className = 'cell-input';
+        td.textContent = '';
+        td.appendChild(input);
+        input.focus();
+        input.select();
+
+        const save = async () => {
+            const newVal = parseFloat(input.value) || 0;
+            if (newVal === oldVal) { td.textContent = this._fmt(oldVal); return; }
+            if (type === 'budget') {
+                await BudgetAPI.updateBudget(itemId, month, newVal);
+            } else {
+                await BudgetAPI.updateActual(itemId, month, newVal);
+            }
+            this.loadTabData();
+        };
+
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') input.blur();
+            if (e.key === 'Escape') { td.textContent = this._fmt(oldVal); }
         });
     },
 
@@ -205,104 +357,46 @@ const BudgetApp = {
 
         const save = async () => {
             const newVal = parseFloat(input.value) || 0;
+            if (newVal === oldVal) { td.textContent = this._fmt(oldVal); return; }
             await BudgetAPI.updateActual(itemId, month, newVal, md.reason || null);
             this.loadTabData();
         };
 
         input.addEventListener('blur', save);
         input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { input.blur(); }
+            if (e.key === 'Enter') input.blur();
             if (e.key === 'Escape') { td.textContent = this._fmt(oldVal); }
         });
     },
 
-    renderActualsTable() {
-        const table = document.getElementById('actuals-table');
-        const thead = table.querySelector('thead tr');
-        const tbody = table.querySelector('tbody');
+    // ===== Variance Note Modal =====
 
-        const baseHeaders = ['项目', 'Tag', '业务场景', '供应商', '明细', '负责人'];
-        const monthHeaders = [];
-        for (let m = 1; m <= 12; m++) monthHeaders.push(`${m}月实际`);
-        const allHeaders = [...baseHeaders, ...monthHeaders, '合计'];
+    _noteContext: null,
 
-        thead.innerHTML = allHeaders.map(h => `<th>${h}</th>`).join('');
-
-        tbody.innerHTML = this.data.map(row => {
-            const base = [
-                this._esc(row.project), this._esc(row.tag), this._esc(row.business_scene),
-                this._esc(row.vendor), this._esc(row.detail), this._esc(row.owner)
-            ];
-            const months = [];
-            for (let m = 1; m <= 12; m++) {
-                const val = row.monthly[`month_${m}`] || 0;
-                months.push(`<td class="editable" data-item-id="${row.id}" data-month="${m}" data-type="actual">${this._fmt(val)}</td>`);
-            }
-            return `<tr>${base.map(b => `<td class="base-col">${b}</td>`).join('')}${months.join('')}<td class="total total-col">${this._fmt(row.total)}</td></tr>`;
-        }).join('');
-
-        tbody.querySelectorAll('.editable').forEach(td => {
-            td.addEventListener('click', () => this.editCell(td));
-        });
-    },
-
-    // ===== Cell Editing =====
-
-    editCell(td) {
+    showNoteModal(td) {
         const itemId = td.dataset.itemId;
         const month = parseInt(td.dataset.month);
-        const type = td.dataset.type;
-        const oldVal = this._parseNum(td.textContent);
-
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.value = oldVal;
-        input.className = 'cell-input';
-        td.textContent = '';
-        td.appendChild(input);
-        input.focus();
-        input.select();
-
-        const save = async () => {
-            const newVal = parseFloat(input.value) || 0;
-            td.textContent = this._fmt(newVal);
-            if (newVal === oldVal) return;
-
-            if (type === 'budget') {
-                await BudgetAPI.updateBudget(itemId, month, newVal);
-            } else {
-                await BudgetAPI.updateActual(itemId, month, newVal);
-            }
-            this.loadTabData();
-        };
-
-        input.addEventListener('blur', save);
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { input.blur(); }
-            if (e.key === 'Escape') { td.textContent = this._fmt(oldVal); }
-        });
-    },
-
-    // ===== Reason Modal =====
-
-    _reasonContext: null,
-
-    showReasonModal(itemId, month) {
-        this._reasonContext = { itemId, month };
         const row = this.data.find(r => r.id == itemId);
         const md = row ? (row.monthly[`month_${month}`] || {}) : {};
-        document.getElementById('reason-context').textContent =
-            `${row ? row.detail : ''} - ${month}月`;
-        document.getElementById('reason-input').value = md.reason || '';
-        document.getElementById('reason-modal').style.display = 'flex';
+
+        this._noteContext = { itemId, month };
+        document.getElementById('note-context').textContent =
+            `${row ? row.project + ' / ' + row.tag + ' / ' + row.business_scene : ''} - ${month}月`;
+        document.getElementById('note-input').value = md.note || '';
+
+        const meta = md.note_updated_by ? `上次编辑: ${md.note_updated_by}` : '';
+        document.getElementById('note-meta').textContent = meta;
+
+        document.getElementById('note-modal').style.display = 'flex';
+        document.getElementById('note-input').focus();
     },
 
-    async saveReason() {
-        if (!this._reasonContext) return;
-        const { itemId, month } = this._reasonContext;
-        const reason = document.getElementById('reason-input').value;
-        await BudgetAPI.updateReason(itemId, month, reason);
-        document.getElementById('reason-modal').style.display = 'none';
+    async saveVarianceNote() {
+        if (!this._noteContext) return;
+        const { itemId, month } = this._noteContext;
+        const note = document.getElementById('note-input').value;
+        await BudgetAPI.updateVarianceNote(itemId, month, note, '');
+        document.getElementById('note-modal').style.display = 'none';
         this.loadTabData();
     },
 
@@ -311,19 +405,14 @@ const BudgetApp = {
     async handlePreview() {
         const fileInput = document.getElementById('import-file');
         if (!fileInput.files.length) { alert('请选择文件'); return; }
-
         const res = await BudgetAPI.previewImport(fileInput.files[0]);
         const el = document.getElementById('import-preview');
         if (res.success) {
-            el.innerHTML = `
-                <div class="preview-info">
-                    <p>明细数: <strong>${res.items_count}</strong></p>
-                    <p>预算记录: <strong>${res.budget_records}</strong></p>
-                    <p>实际记录: <strong>${res.actual_records}</strong></p>
-                    <p>项目: ${(res.projects || []).join(', ')}</p>
-                    <p>负责人: ${(res.owners || []).join(', ')}</p>
-                </div>
-            `;
+            el.innerHTML = `<div class="preview-info">
+                <p>明细: <strong>${res.items_count}</strong> 条 | 预算记录: <strong>${res.budget_records}</strong> | 实际记录: <strong>${res.actual_records}</strong></p>
+                <p>项目: ${(res.projects || []).join(', ')}</p>
+                <p>负责人: ${(res.owners || []).join(', ')}</p>
+            </div>`;
         } else {
             el.innerHTML = `<div class="error">${res.error}</div>`;
         }
@@ -333,17 +422,15 @@ const BudgetApp = {
         const fileInput = document.getElementById('import-file');
         if (!fileInput.files.length) { alert('请选择文件'); return; }
         if (!confirm('导入将覆盖现有数据，确定继续？')) return;
-
         const statusEl = document.getElementById('import-status');
         statusEl.textContent = '导入中...';
-
         const res = await BudgetAPI.importExcel(fileInput.files[0]);
         if (res.success) {
-            statusEl.innerHTML = `<div class="success">导入成功！明细${res.items_count}条，预算${res.budget_records}条，实际${res.actual_records}条</div>`;
+            statusEl.innerHTML = `<div class="success">导入成功！明细${res.items_count}条</div>`;
             document.getElementById('import-modal').style.display = 'none';
             fileInput.value = '';
             document.getElementById('import-preview').innerHTML = '';
-            document.getElementById('import-status').innerHTML = '';
+            statusEl.innerHTML = '';
             this.loadFilterOptions();
             this.loadTabData();
         } else {
@@ -357,17 +444,14 @@ const BudgetApp = {
         if (val === 0 || val === null || val === undefined) return '-';
         return Number(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
     },
-
     _parseNum(str) {
         if (!str || str === '-') return 0;
         return parseFloat(str.replace(/,/g, '')) || 0;
     },
-
-    _esc(str) {
+    _esc(str) { return str || ''; },
+    _truncate(str, len) {
         if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return str.length > len ? str.substring(0, len) + '...' : str;
     }
 };
 
