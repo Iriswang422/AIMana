@@ -41,6 +41,11 @@ def report_dashboard():
 def budget_dashboard():
     return render_template('budget/dashboard.html')
 
+
+@app.route('/budget/import')
+def budget_import_page():
+    return render_template('budget/import.html')
+
 @app.route('/api/upload', methods=['POST'])
 def upload():
     if 'file' not in request.files:
