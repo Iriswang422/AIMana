@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from models.budget import (BudgetRepository, BudgetOwner, BudgetCategory,
                            BudgetItem, BudgetActual, RiskRule)
 
@@ -305,3 +305,4 @@ class BudgetService:
             'owners_count': len(owners_map),
             'items_count': created_count
         }
+
