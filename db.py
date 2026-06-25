@@ -10,13 +10,11 @@ import sqlite3
 _pg_conn = None
 
 SERIAL_COLUMNS = {
-    'budget_owners': 'id',
-    'budget_categories': 'id',
     'budget_items': 'id',
-    'budget_actuals': 'id',
+    'budget_monthly': 'id',
+    'actual_monthly': 'id',
     'budget_change_log': 'id',
     'risk_rules': 'id',
-    'permissions': 'id',
     'reports': 'id',
     'report_data': 'id',
     'report_kpis': 'id',
