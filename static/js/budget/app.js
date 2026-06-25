@@ -192,35 +192,43 @@ const BudgetApp = {
         const tbody = table.querySelector('tbody');
         const tfoot = table.querySelector('tfoot');
 
-        const monthHeaders1 = '<tr><th rowspan="2" class="base-col">项目</th><th rowspan="2" class="base-col">Tag</th><th rowspan="2" class="base-col">业务场景</th><th rowspan="2" class="base-col">负责人</th>';
-        const monthHeaders2 = '<tr>';
+        let headerRow1 = '<tr><th rowspan="2" class="base-col">项目</th><th rowspan="2" class="base-col">Tag</th><th rowspan="2" class="base-col">业务场景</th><th rowspan="2" class="base-col">负责人</th>';
+        let headerRow2 = '<tr>';
         for (let m = 1; m <= 12; m++) {
             const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
-            monthHeaders1 += `<th colspan="4" class="${hl}">${m}月</th>`;
-            monthHeaders2 += `<th class="${hl}">预算</th><th class="${hl}">实际</th><th class="${hl}">差异</th><th class="${hl}">解释</th>`;
+            headerRow1 += `<th colspan="4" class="${hl}">${m}月</th>`;
+            headerRow2 += `<th class="${hl}">预算</th><th class="${hl}">实际</th><th class="${hl}">差异</th><th class="${hl}">解释</th>`;
         }
-        monthHeaders1 += '<th rowspan="2">合计差异</th></tr>';
-        monthHeaders2 += '</tr>';
-        thead.innerHTML = monthHeaders1 + monthHeaders2;
+        headerRow1 += '<th rowspan="2">合计差异</th></tr>';
+        headerRow2 += '</tr>';
+        thead.innerHTML = headerRow1 + headerRow2;
+
+        if (!this.data || !Array.isArray(this.data)) {
+            tbody.innerHTML = '';
+            return;
+        }
 
         tbody.innerHTML = this.data.map(row => {
             const base = [row.project, row.tag, row.business_scene, row.owner]
                 .map(v => `<td class="base-col">${this._esc(v)}</td>`).join('');
             const months = [];
+            const monthly = row.monthly || {};
             for (let m = 1; m <= 12; m++) {
-                const md = row.monthly[`month_${m}`] || {};
+                const md = monthly[`month_${m}`] || {};
                 const riskClass = md.risk ? `risk-${md.risk.toLowerCase()}` : '';
                 const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
                 const noteIcon = md.note ? ' has-note' : '';
+                const noteTitle = this._esc(md.note) || '点击添加差异解释';
                 months.push(
                     `<td class="${hl}">${this._fmt(md.budget)}</td>`,
                     `<td class="editable${hl}" data-item-id="${row.id}" data-month="${m}" data-type="actual">${this._fmt(md.actual)}</td>`,
                     `<td class="${riskClass}${hl}">${this._fmt(md.diff)}</td>`,
-                    `<td class="note-cell${noteIcon}${hl}" data-item-id="${row.id}" data-month="${m}" title="${this._esc(md.note) || '点击添加差异解释'}">${md.note ? this._truncate(md.note, 20) : '<span class="add-note">+</span>'}</td>`
+                    `<td class="note-cell${noteIcon}${hl}" data-item-id="${row.id}" data-month="${m}" title="${noteTitle}">${md.note ? this._truncate(md.note, 20) : '<span class="add-note">+</span>'}</td>`
                 );
             }
-            const diffClass = row.total_diff > 0 ? 'risk-p0' : (row.total_diff < 0 ? 'risk-p2' : '');
-            return `<tr>${base}${months.join('')}<td class="${diffClass} total-col">${this._fmt(row.total_diff)}</td></tr>`;
+            const totalDiff = row.total_diff || 0;
+            const diffClass = totalDiff > 0 ? 'risk-p0' : (totalDiff < 0 ? 'risk-p2' : '');
+            return `<tr>${base}${months.join('')}<td class="${diffClass} total-col">${this._fmt(totalDiff)}</td></tr>`;
         }).join('');
 
         const totals = this._compTotals();
