@@ -49,13 +49,19 @@ def _get_pg_connection():
         except Exception:
             _pg_conn = None
 
-    import psycopg2
-    from psycopg2.extras import DictCursor
-
     url = os.environ['DATABASE_URL']
     if url.startswith('postgres://'):
         url = url.replace('postgres://', 'postgresql://', 1)
 
+    try:
+        import psycopg
+        conn = psycopg.connect(conninfo=url)
+        _pg_conn = conn
+        return PgConnection(conn)
+    except ImportError:
+        pass
+
+    import psycopg2
     params = _parse_pg_url(url)
     conn = psycopg2.connect(**params)
     conn.autocommit = False
@@ -108,9 +114,16 @@ class Row:
 
 class PgCursorWrapper:
     def __init__(self, conn):
-        from psycopg2.extras import DictCursor
         self._conn = conn
-        self._cursor = conn.cursor(cursor_factory=DictCursor)
+        try:
+            from psycopg.rows import dict_row
+            self._cursor = conn.cursor(cursor_factory=dict_row)
+        except (ImportError, ModuleNotFoundError):
+            try:
+                from psycopg2.extras import DictCursor
+                self._cursor = conn.cursor(cursor_factory=DictCursor)
+            except ImportError:
+                self._cursor = conn.cursor()
         self._lastrowid = None
         self._description = None
         self._rows = None
