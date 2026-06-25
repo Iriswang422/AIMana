@@ -60,7 +60,8 @@ def get_comparison_data():
     project = request.args.get('project')
     tag = request.args.get('tag')
     owner = request.args.get('owner')
-    data = budget_service.get_comparison_data(project, tag, owner)
+    month = request.args.get('month', type=int)
+    data = budget_service.get_comparison_data(project, tag, owner, month)
     return jsonify({'success': True, 'data': data})
 
 
@@ -103,6 +104,16 @@ def update_reason(item_id):
     return jsonify({'success': True})
 
 
+@budget_bp.route('/item/<int:item_id>/note', methods=['PUT'])
+def update_variance_note(item_id):
+    data = request.json
+    month = data.get('month')
+    note = data.get('note')
+    updated_by = data.get('updated_by')
+    budget_service.set_variance_note(item_id, month, note, updated_by)
+    return jsonify({'success': True})
+
+
 @budget_bp.route('/filter-options', methods=['GET'])
 def get_filter_options():
     options = budget_service.get_filter_options()
@@ -111,7 +122,8 @@ def get_filter_options():
 
 @budget_bp.route('/risk-summary', methods=['GET'])
 def get_risk_summary():
-    summary = budget_service.get_risk_summary()
+    month = request.args.get('month', type=int)
+    summary = budget_service.get_risk_summary(month)
     return jsonify({'success': True, 'data': summary})
 
 
