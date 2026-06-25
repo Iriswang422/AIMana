@@ -44,7 +44,8 @@
 
         <!-- 标签页导航 -->
         <nav class="tab-nav">
-            <button class="tab-btn active" data-tab="budget-edit">预算编辑</button>
+            <button class="tab-btn active" data-tab="budget-edit">FY26 预算</button>
+            <button class="tab-btn" data-tab="actuals">实际成本</button>
             <button class="tab-btn" data-tab="analysis">预实对比</button>
             <button class="tab-btn" data-tab="trend">月度趋势</button>
             <button class="tab-btn" data-tab="settings">设置</button>
@@ -86,6 +87,80 @@
 
                 <div id="budget-tree" class="budget-tree">
                     <!-- 动态加载三层结构 -->
+                </div>
+            </div>
+
+            <!-- 实际成本 -->
+            <div id="actuals-tab" class="tab-pane">
+                <div class="section-header">
+                    <h2>实际成本上传</h2>
+                </div>
+
+                <div class="upload-section">
+                    <div class="upload-instructions">
+                        <h3>Excel 格式说明</h3>
+                        <table class="info-table">
+                            <thead>
+                                <tr>
+                                    <th>负责人</th>
+                                    <th>板块</th>
+                                    <th>明细名称</th>
+                                    <th>月份</th>
+                                    <th>实际金额</th>
+                                    <th>变动理由</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>张三</td>
+                                    <td>人力成本</td>
+                                    <td>工资</td>
+                                    <td>2026-01</td>
+                                    <td>95000</td>
+                                    <td>正常发放</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p style="font-size:12px; color:#666; margin-top:10px;">
+                            月份格式：2026-01, 2026-02, ... 2026-12
+                        </p>
+                    </div>
+
+                    <div class="upload-area">
+                        <input type="file" id="actuals-upload-file" accept=".xlsx,.xls">
+                        <button id="preview-actuals-btn" class="btn btn-secondary">预览数据</button>
+                        <button id="upload-actuals-btn" class="btn btn-primary">确认上传</button>
+                    </div>
+
+                    <div id="actuals-upload-status" style="margin-top:15px;"></div>
+
+                    <div id="actuals-preview-modal" class="modal" style="display:none;">
+                        <div class="modal-content" style="max-width:900px;">
+                            <h3>预览实际数数据</h3>
+                            <div id="actuals-preview-content"></div>
+                            <button class="btn" onclick="document.getElementById('actuals-preview-modal').style.display='none'">关闭</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="margin-top:30px;">
+                    <h3>已上传记录</h3>
+                    <div class="table-container">
+                        <table id="actuals-table" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>负责人</th>
+                                    <th>板块</th>
+                                    <th>明细</th>
+                                    <th>月份</th>
+                                    <th>实际金额</th>
+                                    <th>变动理由</th>
+                                    <th>风险</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
