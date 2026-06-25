@@ -109,6 +109,27 @@ class RiskRule:
         }
 
 
+class VarianceNote:
+    def __init__(self, id=None, item_id=None, month=None, note=None,
+                 updated_by=None, updated_at=None):
+        self.id = id
+        self.item_id = item_id
+        self.month = month
+        self.note = note
+        self.updated_by = updated_by
+        self.updated_at = updated_at
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'item_id': self.item_id,
+            'month': self.month,
+            'note': self.note,
+            'updated_by': self.updated_by,
+            'updated_at': self.updated_at,
+        }
+
+
 class BudgetRepository:
     def __init__(self):
         self._init_tables()
@@ -168,6 +189,19 @@ class BudgetRepository:
                 old_amount REAL,
                 new_amount REAL,
                 changed_by TEXT,
+                FOREIGN KEY (item_id) REFERENCES budget_items(id)
+            )
+        '''))
+
+        cursor.execute(translate_create_table('''
+            CREATE TABLE IF NOT EXISTS variance_notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                note TEXT,
+                updated_by TEXT,
+                updated_at TEXT,
+                UNIQUE(item_id, month),
                 FOREIGN KEY (item_id) REFERENCES budget_items(id)
             )
         '''))
@@ -422,3 +456,49 @@ class BudgetRepository:
         owners = [r[0] for r in cursor.fetchall()]
         conn.close()
         return {'projects': projects, 'tags': tags, 'owners': owners}
+
+    # ===== Variance Notes =====
+    def set_variance_note(self, item_id, month, note, updated_by=None):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        cursor.execute("SELECT id FROM variance_notes WHERE item_id=? AND month=?", (item_id, month))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute("UPDATE variance_notes SET note=?, updated_by=?, updated_at=? WHERE id=?",
+                           (note, updated_by, now, row[0]))
+        else:
+            cursor.execute("INSERT INTO variance_notes (item_id, month, note, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)",
+                           (item_id, month, note, updated_by, now))
+        conn.commit()
+        conn.close()
+
+    def get_variance_notes(self, item_ids=None, month=None):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        if item_ids and month:
+            placeholders = ','.join(['?'] * len(item_ids))
+            cursor.execute(f"SELECT * FROM variance_notes WHERE item_id IN ({placeholders}) AND month=?",
+                           list(item_ids) + [month])
+        elif item_ids:
+            placeholders = ','.join(['?'] * len(item_ids))
+            cursor.execute(f"SELECT * FROM variance_notes WHERE item_id IN ({placeholders})", list(item_ids))
+        else:
+            cursor.execute("SELECT * FROM variance_notes")
+        rows = cursor.fetchall()
+        conn.close()
+        return [VarianceNote(id=r[0], item_id=r[1], month=r[2], note=r[3],
+                             updated_by=r[4], updated_at=r[5]) for r in rows]
+
+    def get_all_variance_notes(self):
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT item_id, month, note, updated_by, updated_at FROM variance_notes")
+        rows = cursor.fetchall()
+        conn.close()
+        result = {}
+        for r in rows:
+            if r[0] not in result:
+                result[r[0]] = {}
+            result[r[0]][r[1]] = {'note': r[2], 'updated_by': r[3], 'updated_at': r[4]}
+        return result
