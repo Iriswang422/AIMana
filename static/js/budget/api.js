@@ -68,6 +68,15 @@ const BudgetAPI = {
         return res.json();
     },
 
+    async updateVarianceNote(item_id, month, note, updated_by) {
+        const res = await fetch(`/api/budget/item/${item_id}/note`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ month, note, updated_by })
+        });
+        return res.json();
+    },
+
     async getRiskRules() {
         const res = await fetch('/api/budget/risk-rules');
         return res.json();
