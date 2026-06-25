@@ -300,6 +300,7 @@ class BudgetRepository:
     def delete_all_items(self):
         conn = self._get_conn()
         cursor = conn.cursor()
+        cursor.execute("DELETE FROM variance_notes")
         cursor.execute("DELETE FROM actual_monthly")
         cursor.execute("DELETE FROM budget_monthly")
         cursor.execute("DELETE FROM budget_change_log")
