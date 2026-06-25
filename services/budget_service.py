@@ -90,11 +90,12 @@ class BudgetService:
         all_budgets = self.repo.get_all_budgets()
         return self._build_tab_data(items, all_budgets, 'budget', project, tag, owner)
 
-    def get_comparison_data(self, project=None, tag=None, owner=None):
+    def get_comparison_data(self, project=None, tag=None, owner=None, month=None):
         items = self.repo.get_all_items()
         all_budgets = self.repo.get_all_budgets()
         all_actuals = self.repo.get_all_actuals()
-        return self._build_comparison_data(items, all_budgets, all_actuals, project, tag, owner)
+        all_notes = self.repo.get_all_variance_notes()
+        return self._build_comparison_data(items, all_budgets, all_actuals, all_notes, project, tag, owner, month)
 
     def get_actuals_data(self, project=None, tag=None, owner=None):
         items = self.repo.get_all_items()
@@ -131,29 +132,36 @@ class BudgetService:
             rows.append(item_data)
         return rows
 
-    def _build_comparison_data(self, items, all_budgets, all_actuals, project=None, tag=None, owner=None):
+    def _build_comparison_data(self, items, all_budgets, all_actuals, all_notes=None, project=None, tag=None, owner=None, month=None):
         filtered = self._filter_items(items, project, tag, owner)
         rows = []
         for item in filtered:
             item_data = item.to_dict()
             budgets = all_budgets.get(item.id, {})
             actuals = all_actuals.get(item.id, {})
+            notes = (all_notes or {}).get(item.id, {})
             months = {}
             total_budget = 0
             total_actual = 0
-            for m in range(1, 13):
+            months_to_iter = [month] if month else range(1, 13)
+            for m in months_to_iter:
                 b = budgets.get(m, 0)
                 a_info = actuals.get(m, {})
                 a = a_info.get('amount', 0) if isinstance(a_info, dict) else 0
                 diff = a - b if b else 0
                 risk = self.classify_risk(b, a)
                 reason = a_info.get('reason') if isinstance(a_info, dict) else None
+                note_info = notes.get(m, {})
+                note = note_info.get('note') if isinstance(note_info, dict) else None
+                note_updated_by = note_info.get('updated_by') if isinstance(note_info, dict) else None
                 months[f'month_{m}'] = {
                     'budget': b,
                     'actual': a,
                     'diff': diff,
                     'risk': risk,
                     'reason': reason,
+                    'note': note,
+                    'note_updated_by': note_updated_by,
                 }
                 total_budget += b
                 total_actual += a
@@ -190,17 +198,25 @@ class BudgetService:
     def update_reason(self, item_id, month, reason):
         self.repo.update_actual_reason(item_id, month, reason)
 
+    def set_variance_note(self, item_id, month, note, updated_by=None):
+        self.repo.set_variance_note(item_id, month, note, updated_by)
+
+    def get_variance_notes(self, item_ids=None, month=None):
+        notes = self.repo.get_variance_notes(item_ids, month)
+        return [n.to_dict() for n in notes]
+
     # ===== Risk Summary =====
-    def get_risk_summary(self):
+    def get_risk_summary(self, month=None):
         items = self.repo.get_all_items()
         all_budgets = self.repo.get_all_budgets()
         all_actuals = self.repo.get_all_actuals()
 
         counts = {'P0': 0, 'P1': 0, 'P2': 0, 'P3': 0}
+        months_to_check = [month] if month else range(1, 13)
         for item in items:
             budgets = all_budgets.get(item.id, {})
             actuals = all_actuals.get(item.id, {})
-            for m in range(1, 13):
+            for m in months_to_check:
                 b = budgets.get(m, 0)
                 a_info = actuals.get(m, {})
                 a = a_info.get('amount', 0) if isinstance(a_info, dict) else 0
