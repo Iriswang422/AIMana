@@ -420,6 +420,33 @@ class BudgetRepository:
         conn.commit()
         conn.close()
 
+    def get_all_actuals_with_details(self):
+        """获取所有实际数记录，关联负责人、板块、明细名称"""
+        conn = self._get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT a.id, a.item_id, a.month, a.actual_amount, a.reason, a.risk_level,
+                   o.name as owner_name, c.name as category_name, i.item_name
+            FROM budget_actuals a
+            JOIN budget_items i ON a.item_id = i.id
+            JOIN budget_categories c ON i.category_id = c.id
+            JOIN budget_owners o ON c.owner_id = o.id
+            ORDER BY o.name, c.name, i.item_name, a.month
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [{
+            'id': r[0],
+            'item_id': r[1],
+            'month': r[2],
+            'actual_amount': r[3],
+            'reason': r[4],
+            'risk_level': r[5],
+            'owner_name': r[6],
+            'category_name': r[7],
+            'item_name': r[8]
+        } for r in rows]
+
     # ===== Change Log =====
     def get_change_log(self, item_id=None):
         conn = self._get_conn()
