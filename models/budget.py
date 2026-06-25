@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-import sqlite3
 from datetime import datetime
-from config import Config
+from db import get_connection, translate_create_table
 
 
 class BudgetOwner:
@@ -143,29 +142,28 @@ class Permission:
 
 class BudgetRepository:
     def __init__(self):
-        self.db_path = Config.DATABASE_PATH
         self._init_tables()
         self._init_risk_rules()
 
     def _get_conn(self):
-        return sqlite3.connect(self.db_path)
+        return get_connection()
 
     def _init_tables(self):
         conn = self._get_conn()
         cursor = conn.cursor()
 
         # 负责人表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS budget_owners (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 feishu_group TEXT,
                 sort_order INTEGER DEFAULT 0
             )
-        ''')
+        '''))
 
         # 预算板块表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS budget_categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 owner_id INTEGER NOT NULL,
@@ -174,10 +172,10 @@ class BudgetRepository:
                 UNIQUE(owner_id, name),
                 FOREIGN KEY (owner_id) REFERENCES budget_owners(id)
             )
-        ''')
+        '''))
 
         # 预算明细表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS budget_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category_id INTEGER NOT NULL,
@@ -188,10 +186,10 @@ class BudgetRepository:
                 UNIQUE(category_id, item_name),
                 FOREIGN KEY (category_id) REFERENCES budget_categories(id)
             )
-        ''')
+        '''))
 
         # 实际数表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS budget_actuals (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 item_id INTEGER NOT NULL,
@@ -202,10 +200,10 @@ class BudgetRepository:
                 UNIQUE(item_id, month),
                 FOREIGN KEY (item_id) REFERENCES budget_items(id)
             )
-        ''')
+        '''))
 
         # 变更记录表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS budget_change_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 item_id INTEGER NOT NULL,
@@ -216,10 +214,10 @@ class BudgetRepository:
                 changed_by TEXT,
                 FOREIGN KEY (item_id) REFERENCES budget_items(id)
             )
-        ''')
+        '''))
 
         # 风险规则表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS risk_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 level TEXT NOT NULL UNIQUE,
@@ -228,10 +226,10 @@ class BudgetRepository:
                 threshold REAL,
                 is_active INTEGER DEFAULT 1
             )
-        ''')
+        '''))
 
         # 权限表
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT,
@@ -240,7 +238,7 @@ class BudgetRepository:
                 role TEXT DEFAULT 'viewer',
                 UNIQUE(user_id, owner_id)
             )
-        ''')
+        '''))
 
         conn.commit()
         conn.close()
