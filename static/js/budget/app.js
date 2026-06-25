@@ -157,7 +157,6 @@ const BudgetApp = {
         const table = document.getElementById('budget-table');
         const thead = table.querySelector('thead tr');
         const tbody = table.querySelector('tbody');
-        const tfoot = table.querySelector('tfoot');
 
         const baseHeaders = ['项目', 'Tag', '业务场景', '供应商', '明细', '负责人'];
         const monthHeaders = [];
@@ -165,7 +164,7 @@ const BudgetApp = {
         const allHeaders = [...baseHeaders, ...monthHeaders, '合计'];
         thead.innerHTML = allHeaders.map(h => `<th>${h}</th>`).join('');
 
-        tbody.innerHTML = this.data.map(row => {
+        const rows = this.data.map(row => {
             const base = [row.project, row.tag, row.business_scene, row.vendor, row.detail, row.owner]
                 .map(v => `<td class="base-col">${this._esc(v)}</td>`).join('');
             const months = [];
@@ -175,10 +174,13 @@ const BudgetApp = {
                 months.push(`<td class="editable${highlight}" data-item-id="${row.id}" data-month="${m}" data-type="budget">${this._fmt(val)}</td>`);
             }
             return `<tr>${base}${months.join('')}<td class="total total-col">${this._fmt(row.total)}</td></tr>`;
-        }).join('');
+        });
 
         const totals = this._calcTotals('budget');
-        tfoot.innerHTML = `<tr class="total-row"><td class="base-col" colspan="6">合计</td>${totals.months.map(v => `<td class="total-col">${this._fmt(v)}</td>`).join('')}<td class="total total-col">${this._fmt(totals.grand)}</td></tr>`;
+        const totalCells = totals.months.map(v => `<td class="total-col">${this._fmt(v)}</td>`).join('');
+        rows.push(`<tr class="total-row" style="background:#f0f5ff;border-top:2px solid #1890ff"><td class="base-col" colspan="6" style="font-weight:700">合计</td>${totalCells}<td class="total total-col" style="font-weight:700">${this._fmt(totals.grand)}</td></tr>`);
+
+        tbody.innerHTML = rows.join('');
 
         tbody.querySelectorAll('.editable').forEach(td => {
             td.addEventListener('click', () => this.editCell(td));
