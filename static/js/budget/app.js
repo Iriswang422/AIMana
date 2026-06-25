@@ -1,5 +1,5 @@
 const BudgetApp = {
-    currentTab: 'budget',
+    currentTab: 'summary',
     filters: { project: '', tag: '', owner: '', month: '' },
     data: [],
 
@@ -85,7 +85,9 @@ const BudgetApp = {
     async loadTabData() {
         const params = this._getParams();
 
-        if (this.currentTab === 'budget') {
+        if (this.currentTab === 'summary') {
+            await this.renderSummary();
+        } else if (this.currentTab === 'budget') {
             const res = await BudgetAPI.getBudgetData(params);
             if (res.success) {
                 this.data = res.data;
@@ -149,6 +151,173 @@ const BudgetApp = {
         document.getElementById('actuals-summary').innerHTML =
             `<span>共 <strong>${this.data.length}</strong> 条明细</span>
              <span>合计实际: <strong class="total-val">${this._fmt(total)}</strong></span>`;
+    },
+
+    // ===== Summary Tab =====
+
+    async renderSummary() {
+        const container = document.getElementById('summary-content');
+        container.innerHTML = '<div style="text-align:center;padding:40px;color:#999">加载中...</div>';
+
+        const [budgetRes, actualsRes] = await Promise.all([
+            BudgetAPI.getBudgetData(this._getParams()),
+            BudgetAPI.getActualsData(this._getParams())
+        ]);
+
+        if (!budgetRes.success || !actualsRes.success) {
+            container.innerHTML = '<div style="text-align:center;padding:40px;color:#cf1322">加载失败</div>';
+            return;
+        }
+
+        const budgetData = budgetRes.data;
+        const actualsData = actualsRes.data;
+
+        // Build actuals lookup by item id
+        const actualsMap = {};
+        actualsData.forEach(row => {
+            actualsMap[row.id] = row.monthly;
+        });
+
+        // KPI totals
+        let totalBudget = 0, totalActual = 0;
+        const monthlyBudget = {}, monthlyActual = {};
+        for (let m = 1; m <= 12; m++) { monthlyBudget[m] = 0; monthlyActual[m] = 0; }
+
+        budgetData.forEach(row => {
+            for (let m = 1; m <= 12; m++) {
+                const b = row.monthly[`month_${m}`] || 0;
+                monthlyBudget[m] += b;
+                totalBudget += b;
+            }
+        });
+
+        actualsData.forEach(row => {
+            for (let m = 1; m <= 12; m++) {
+                const a = row.monthly[`month_${m}`] || 0;
+                monthlyActual[m] += a;
+                totalActual += a;
+            }
+        });
+
+        const usageRate = totalBudget > 0 ? (totalActual / totalBudget * 100) : 0;
+        const remaining = totalBudget - totalActual;
+
+        // Group by project for progress
+        const projectMap = {};
+        budgetData.forEach(row => {
+            const proj = row.project || '未分类';
+            if (!projectMap[proj]) {
+                projectMap[proj] = { budget: 0, actual: 0 };
+            }
+            for (let m = 1; m <= 12; m++) {
+                projectMap[proj].budget += row.monthly[`month_${m}`] || 0;
+            }
+        });
+
+        actualsData.forEach(row => {
+            const proj = row.project || '未分类';
+            if (!projectMap[proj]) {
+                projectMap[proj] = { budget: 0, actual: 0 };
+            }
+            for (let m = 1; m <= 12; m++) {
+                projectMap[proj].actual += row.monthly[`month_${m}`] || 0;
+            }
+        });
+
+        // Build HTML
+        let html = '';
+
+        // KPI Cards
+        html += '<div class="kpi-row">';
+        html += `<div class="kpi-card budget-card">
+            <div class="kpi-label">全年总预算</div>
+            <div class="kpi-value">${this._fmt(totalBudget)}</div>
+            <div class="kpi-sub">${budgetData.length} 条明细</div>
+        </div>`;
+        html += `<div class="kpi-card actual-card">
+            <div class="kpi-label">已使用</div>
+            <div class="kpi-value">${this._fmt(totalActual)}</div>
+            <div class="kpi-sub">使用率 ${usageRate.toFixed(1)}%</div>
+        </div>`;
+        html += `<div class="kpi-card progress-card">
+            <div class="kpi-label">剩余预算</div>
+            <div class="kpi-value">${this._fmt(remaining)}</div>
+            <div class="kpi-sub">${remaining >= 0 ? '可用' : '超支'}</div>
+        </div>`;
+        html += '</div>';
+
+        // Progress by project
+        html += '<div class="summary-section">';
+        html += '<div class="section-title"><span class="icon">&#9632;</span> 各团队预算使用进度</div>';
+        html += '<div class="progress-grid">';
+
+        const projects = Object.keys(projectMap).sort((a, b) => projectMap[b].budget - projectMap[a].budget);
+        projects.forEach(proj => {
+            const p = projectMap[proj];
+            const pct = p.budget > 0 ? (p.actual / p.budget * 100) : 0;
+            const pctClass = pct > 90 ? 'high' : pct > 60 ? 'mid' : 'low';
+            const barClass = pct > 90 ? 'high' : pct > 60 ? 'mid' : 'low';
+            const remain = p.budget - p.actual;
+
+            html += `<div class="progress-item">
+                <div class="progress-header">
+                    <div class="progress-name">${this._esc(proj)}</div>
+                    <div class="progress-pct ${pctClass}">${pct.toFixed(1)}%</div>
+                </div>
+                <div class="progress-bar-track">
+                    <div class="progress-bar-fill ${barClass}" style="width:${Math.min(pct, 100)}%"></div>
+                </div>
+                <div class="progress-stats">
+                    <span><i class="dot budget-dot"></i>预算 ${this._fmt(p.budget)}</span>
+                    <span><i class="dot actual-dot"></i>实际 ${this._fmt(p.actual)}</span>
+                    <span><i class="dot remain-dot"></i>剩余 ${this._fmt(remain)}</span>
+                </div>
+            </div>`;
+        });
+        html += '</div></div>';
+
+        // Monthly bar chart
+        html += '<div class="summary-section">';
+        html += '<div class="section-title"><span class="icon">&#9636;</span> 月度预算 vs 实际对比</div>';
+        html += '<div class="chart-container">';
+        html += '<div class="chart-legend">';
+        html += '<div class="legend-item"><div class="legend-color budget"></div>预算</div>';
+        html += '<div class="legend-item"><div class="legend-color actual"></div>实际</div>';
+        html += '</div>';
+
+        // Find max value for scaling
+        let maxVal = 0;
+        for (let m = 1; m <= 12; m++) {
+            maxVal = Math.max(maxVal, monthlyBudget[m], monthlyActual[m]);
+        }
+        if (maxVal === 0) maxVal = 1;
+
+        html += '<div class="bar-chart">';
+        for (let m = 1; m <= 12; m++) {
+            const bH = (monthlyBudget[m] / maxVal * 220);
+            const aH = (monthlyActual[m] / maxVal * 220);
+            html += `<div class="bar-group">
+                <div class="bar-pair">
+                    <div class="bar budget-bar" style="height:${Math.max(bH, 2)}px">
+                        <div class="bar-tooltip">预算: ${this._fmt(monthlyBudget[m])}</div>
+                    </div>
+                    <div class="bar actual-bar" style="height:${Math.max(aH, 2)}px">
+                        <div class="bar-tooltip">实际: ${this._fmt(monthlyActual[m])}</div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+
+        html += '<div class="bar-labels">';
+        for (let m = 1; m <= 12; m++) {
+            html += `<div class="bar-label">${m}月</div>`;
+        }
+        html += '</div>';
+
+        html += '</div></div>';
+
+        container.innerHTML = html;
     },
 
     // ===== Table Rendering =====
