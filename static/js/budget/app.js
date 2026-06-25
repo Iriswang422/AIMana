@@ -683,6 +683,123 @@ const BudgetApp = {
         document.getElementById('add-perm-btn').addEventListener('click', () => {
             this.addPermission();
         });
+
+        // Excel 导入
+        document.getElementById('import-excel-btn').addEventListener('click', () => {
+            document.getElementById('import-section').style.display = 'block';
+        });
+
+        document.getElementById('preview-import-btn').addEventListener('click', () => {
+            this.handleBudgetImportPreview();
+        });
+
+        document.getElementById('confirm-import-btn').addEventListener('click', () => {
+            this.handleBudgetImport();
+        });
+    },
+
+    // ===== Excel 批量导入 =====
+    async handleBudgetImportPreview() {
+        const fileInput = document.getElementById('budget-import-file');
+        const statusDiv = document.getElementById('import-status');
+
+        if (!fileInput.files.length) {
+            statusDiv.innerHTML = '<div class="error">请选择文件</div>';
+            return;
+        }
+
+        statusDiv.innerHTML = '<div class="info">解析中...</div>';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/api/budget/import-preview', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                const content = document.getElementById('import-preview-content');
+                content.innerHTML = `
+                    <p>共 ${result.total_rows} 条记录</p>
+                    <p>将创建：${result.owners_count}个负责人, ${result.categories_count}个板块, ${result.items_count}条明细</p>
+                    ${result.warnings.length > 0 ? `<div class="warning" style="background:#fff3cd;padding:10px;border-radius:4px;margin:10px 0;">️ ${result.warnings.join('<br/>')}</div>` : ''}
+                    <h4>前20条预览:</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>负责人</th>
+                                <th>板块</th>
+                                <th>明细</th>
+                                <th>原预算</th>
+                                <th>当前预算</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${result.preview.map(row => `
+                                <tr>
+                                    <td>${row.owner}</td>
+                                    <td>${row.category}</td>
+                                    <td>${row.item_name}</td>
+                                    <td>${this.formatMoney(row.original_budget)}</td>
+                                    <td>${this.formatMoney(row.current_budget)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                document.getElementById('import-preview-modal').style.display = 'flex';
+                statusDiv.innerHTML = '<div class="success">解析成功，请预览后确认导入</div>';
+            } else {
+                statusDiv.innerHTML = `<div class="error">解析失败：${result.error}</div>`;
+            }
+        } catch (e) {
+            statusDiv.innerHTML = `<div class="error">请求失败：${e.message}</div>`;
+        }
+    },
+
+    async handleBudgetImport() {
+        const fileInput = document.getElementById('budget-import-file');
+        const statusDiv = document.getElementById('import-status');
+
+        if (!fileInput.files.length) {
+            statusDiv.innerHTML = '<div class="error">请选择文件</div>';
+            return;
+        }
+
+        if (!confirm('确定要导入这些数据吗？')) return;
+
+        statusDiv.innerHTML = '<div class="info">导入中...</div>';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/api/budget/import', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        导入成功！<br/>
+                        创建：${result.owners_count}个负责人, ${result.categories_count}个板块, ${result.items_count}条明细
+                    </div>
+                `;
+                fileInput.value = '';
+                document.getElementById('import-section').style.display = 'none';
+                await this.loadTree();
+                await this.loadAnalysis();
+            } else {
+                statusDiv.innerHTML = `<div class="error">导入失败：${result.error}</div>`;
+            }
+        } catch (e) {
+            statusDiv.innerHTML = `<div class="error">请求失败：${e.message}</div>`;
+        }
     },
 
     formatMoney(num) {
