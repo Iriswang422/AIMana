@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>发行美宣预提小工具</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>发行美宣预提小工具</h1>
+
+        <div class="section">
+            <h2>1. 上传文件</h2>
+            <div class="upload-area">
+                <input type="file" id="file-input" accept=".xlsx,.xls">
+                <button onclick="handleUpload()">上传</button>
+            </div>
+            <div id="upload-status"></div>
+        </div>
+
+        <div class="section" id="file-info" style="display:none;">
+            <h2>2. 文件信息</h2>
+            <p>文件名：<span id="filename"></span></p>
+            <p>数据行数：<span id="row-count-info"></span></p>
+            <button onclick="showPreview()">预览数据</button>
+            <div id="preview-container" style="display:none;">
+                <table id="preview-table"></table>
+            </div>
+        </div>
+
+        <div class="section" id="filter-section" style="display:none;">
+            <h2>3. 设置筛选条件</h2>
+
+            <div class="filter-group">
+                <label>项目：</label>
+                <select id="filter-project" multiple size="5">
+                    <option value="">加载中...</option>
+                </select>
+                <span class="hint">按住Ctrl可多选</span>
+            </div>
+
+            <div class="filter-group">
+                <label>采购发包月：</label>
+                <select id="filter-month" multiple size="5">
+                    <option value="">加载中...</option>
+                </select>
+                <span class="hint">按住Ctrl可多选</span>
+            </div>
+
+            <div class="filter-group">
+                <label>费用子单元：</label>
+                <select id="filter-fee-unit" multiple size="5">
+                    <option value="">加载中...</option>
+                </select>
+                <span class="hint">按住Ctrl可多选</span>
+            </div>
+
+            <button onclick="executeFilter()" class="primary-btn">执行筛选并导出</button>
+        </div>
+
+        <div class="section" id="result-section" style="display:none;">
+            <h2>4. 筛选结果</h2>
+            <p>筛选完成，结果包含 <strong id="result-row-count"></strong> 行数据</p>
+            <button onclick="downloadResult()" class="primary-btn">下载结果</button>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
