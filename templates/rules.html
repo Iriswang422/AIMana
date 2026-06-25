@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>规则管理 - Excel数据筛选工具</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>规则管理</h1>
+
+        <div class="section">
+            <h2>创建新规则</h2>
+            <div class="form-group">
+                <label>规则名称：</label>
+                <input type="text" id="rule-name" placeholder="请输入规则名称">
+            </div>
+            <div class="form-group">
+                <label>规则描述：</label>
+                <input type="text" id="rule-description" placeholder="可选">
+            </div>
+
+            <h3>筛选条件</h3>
+            <div id="conditions-container"></div>
+            <button onclick="addCondition()">+ 添加条件</button>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label>逻辑关系：</label>
+                <label><input type="radio" name="logic" value="AND" checked> AND（所有条件都满足）</label>
+                <label><input type="radio" name="logic" value="OR"> OR（满足任一条件）</label>
+            </div>
+
+            <button onclick="saveRule()" class="primary-btn">保存规则</button>
+        </div>
+
+        <div class="section">
+            <h2>已有规则</h2>
+            <div id="rules-list"></div>
+        </div>
+    </div>
+
+    <script src="/static/js/rules.js"></script>
+</body>
+</html>
