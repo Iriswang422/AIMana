@@ -59,10 +59,6 @@ class BudgetExcelParser:
             return True
         if '合计' in project_str or '小计' in project_str:
             return True
-        detail = row.get('明细', '')
-        detail_str = str(detail).strip() if detail is not None and str(detail) != 'nan' else ''
-        if not detail_str:
-            return True
         return False
 
     def _ensure_item(self, row, item_map):
