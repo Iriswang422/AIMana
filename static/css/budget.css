@@ -84,14 +84,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
-.risk-card {
-    flex: 1;
-    padding: 10px 16px;
-    border-radius: 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+.risk-card { flex: 1; padding: 10px 16px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; }
 .risk-label { font-size: 12px; color: #666; }
 .risk-count { font-size: 24px; font-weight: 700; margin-top: 4px; }
 .risk-p0 { background: #fff1f0; }
@@ -102,6 +95,46 @@ body {
 .risk-p2 .risk-count { color: #8c8c8c; }
 .risk-p3 { background: #f6ffed; }
 .risk-p3 .risk-count { color: #389e0d; }
+
+/* Risk Legend */
+.risk-legend {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 16px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 8px;
+    font-size: 12px;
+    flex-wrap: wrap;
+}
+.legend-title { font-weight: 600; color: #333; }
+.legend-item { padding: 4px 10px; border-radius: 4px; }
+.risk-p0-bg { background: #fff1f0; color: #cf1322; }
+.risk-p1-bg { background: #fff7e6; color: #d46b08; }
+.risk-p2-bg { background: #f5f5f5; color: #8c8c8c; }
+.risk-p3-bg { background: #f6ffed; color: #389e0d; }
+
+/* Summary Bar */
+.summary-bar {
+    display: flex;
+    gap: 20px;
+    padding: 10px 16px;
+    background: #fafbfc;
+    border-bottom: 1px solid #e8e8e8;
+    font-size: 13px;
+    align-items: center;
+}
+.summary-bar strong { font-size: 14px; }
+.summary-bar .neg { color: #cf1322; }
+.summary-bar .total-val { color: #1890ff; }
+
+/* Highlight column for selected month */
+.excel-table .highlight-col {
+    background: #e6f7ff !important;
+    outline: 1px solid #91d5ff;
+}
 
 /* Tab Content */
 .tab-content {
@@ -171,6 +204,48 @@ body {
     outline: none;
 }
 
+/* Note cell */
+.excel-table td.note-cell {
+    cursor: pointer;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    font-size: 11px;
+    color: #666;
+}
+.excel-table td.note-cell:hover {
+    background: #e6f7ff !important;
+    outline: 2px solid #1890ff;
+}
+.excel-table td.note-cell.has-note {
+    color: #1890ff;
+    font-weight: 500;
+}
+.add-note {
+    color: #bbb;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Total row */
+.excel-table tfoot .total-row td {
+    background: #f0f5ff;
+    font-weight: 600;
+    border-top: 2px solid #1890ff;
+}
+
+/* Note modal */
+.note-meta { font-size: 11px; color: #999; margin-top: 8px; }
+#note-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    font-size: 13px;
+    resize: vertical;
+}
+
 /* Modal */
 .modal {
     position: fixed;
@@ -195,15 +270,6 @@ body {
 .modal-content h3 { margin-bottom: 12px; font-size: 18px; }
 .modal-hint { color: #999; font-size: 12px; margin-bottom: 12px; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
-
-#reason-input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #d9d9d9;
-    border-radius: 4px;
-    font-size: 13px;
-    resize: vertical;
-}
 
 .preview-info {
     background: #f9f9f9;
