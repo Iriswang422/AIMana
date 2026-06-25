@@ -157,7 +157,7 @@ const BudgetApp = {
 
     async renderSummary() {
         const container = document.getElementById('summary-content');
-        container.innerHTML = '<div style="text-align:center;padding:40px;color:#999">加载中...</div>';
+        container.innerHTML = '<div style="text-align:center;padding:60px;color:#bbb;font-size:14px">加载中...</div>';
 
         const [budgetRes, actualsRes] = await Promise.all([
             BudgetAPI.getBudgetData(this._getParams()),
@@ -165,20 +165,13 @@ const BudgetApp = {
         ]);
 
         if (!budgetRes.success || !actualsRes.success) {
-            container.innerHTML = '<div style="text-align:center;padding:40px;color:#cf1322">加载失败</div>';
+            container.innerHTML = '<div style="text-align:center;padding:60px;color:#cf1322">加载失败</div>';
             return;
         }
 
         const budgetData = budgetRes.data;
         const actualsData = actualsRes.data;
 
-        // Build actuals lookup by item id
-        const actualsMap = {};
-        actualsData.forEach(row => {
-            actualsMap[row.id] = row.monthly;
-        });
-
-        // KPI totals
         let totalBudget = 0, totalActual = 0;
         const monthlyBudget = {}, monthlyActual = {};
         for (let m = 1; m <= 12; m++) { monthlyBudget[m] = 0; monthlyActual[m] = 0; }
@@ -202,175 +195,175 @@ const BudgetApp = {
         const usageRate = totalBudget > 0 ? (totalActual / totalBudget * 100) : 0;
         const remaining = totalBudget - totalActual;
 
-        // Group by project for progress
+        const html = [];
+
+        html.push('<div class="dash-header">');
+        html.push('<div class="dash-title">预算使用概览</div>');
+        html.push(`<div class="dash-subtitle">FY26 年度 · 截至 ${new Date().getFullYear()}年${new Date().getMonth()+1}月</div>`);
+        html.push('</div>');
+
+        // KPI Cards
+        html.push('<div class="kpi-row">');
+        html.push(`<div class="kpi-card kpi-budget">
+            <div class="kpi-icon">&#128176;</div>
+            <div class="kpi-body">
+                <div class="kpi-label">全年总预算</div>
+                <div class="kpi-value">${this._fmt(totalBudget)}</div>
+            </div>
+            <div class="kpi-foot">${budgetData.length} 条明细</div>
+        </div>`);
+        html.push(`<div class="kpi-card kpi-actual">
+            <div class="kpi-icon">&#128184;</div>
+            <div class="kpi-body">
+                <div class="kpi-label">累计已使用</div>
+                <div class="kpi-value">${this._fmt(totalActual)}</div>
+            </div>
+            <div class="kpi-foot">使用率 <b>${usageRate.toFixed(1)}%</b></div>
+        </div>`);
+        html.push(`<div class="kpi-card kpi-remain">
+            <div class="kpi-icon">&#128178;</div>
+            <div class="kpi-body">
+                <div class="kpi-label">剩余预算</div>
+                <div class="kpi-value">${this._fmt(remaining)}</div>
+            </div>
+            <div class="kpi-foot">${remaining >= 0 ? '可用余额' : '已超支'}</div>
+        </div>`);
+        html.push('</div>');
+
+        // Project progress bars
         const projectMap = {};
         budgetData.forEach(row => {
             const proj = row.project || '未分类';
-            if (!projectMap[proj]) {
-                projectMap[proj] = { budget: 0, actual: 0 };
-            }
-            for (let m = 1; m <= 12; m++) {
-                projectMap[proj].budget += row.monthly[`month_${m}`] || 0;
-            }
+            if (!projectMap[proj]) projectMap[proj] = { budget: 0, actual: 0 };
+            for (let m = 1; m <= 12; m++) projectMap[proj].budget += row.monthly[`month_${m}`] || 0;
         });
-
         actualsData.forEach(row => {
             const proj = row.project || '未分类';
-            if (!projectMap[proj]) {
-                projectMap[proj] = { budget: 0, actual: 0 };
-            }
-            for (let m = 1; m <= 12; m++) {
-                projectMap[proj].actual += row.monthly[`month_${m}`] || 0;
-            }
+            if (!projectMap[proj]) projectMap[proj] = { budget: 0, actual: 0 };
+            for (let m = 1; m <= 12; m++) projectMap[proj].actual += row.monthly[`month_${m}`] || 0;
         });
 
-        // Build HTML
-        let html = '';
+        html.push('<div class="summary-section">');
+        html.push('<div class="sec-title">各项目预算使用进度</div>');
+        html.push('<div class="progress-grid">');
 
-        // KPI Cards
-        html += '<div class="kpi-row">';
-        html += `<div class="kpi-card budget-card">
-            <div class="kpi-label">全年总预算</div>
-            <div class="kpi-value">${this._fmt(totalBudget)}</div>
-            <div class="kpi-sub">${budgetData.length} 条明细</div>
-        </div>`;
-        html += `<div class="kpi-card actual-card">
-            <div class="kpi-label">已使用</div>
-            <div class="kpi-value">${this._fmt(totalActual)}</div>
-            <div class="kpi-sub">使用率 ${usageRate.toFixed(1)}%</div>
-        </div>`;
-        html += `<div class="kpi-card progress-card">
-            <div class="kpi-label">剩余预算</div>
-            <div class="kpi-value">${this._fmt(remaining)}</div>
-            <div class="kpi-sub">${remaining >= 0 ? '可用' : '超支'}</div>
-        </div>`;
-        html += '</div>';
-
-        // Progress by project
-        html += '<div class="summary-section">';
-        html += '<div class="section-title"><span class="icon">&#9632;</span> 各项目预算使用进度</div>';
-        html += '<div class="progress-grid">';
-
-        const projects = Object.keys(projectMap).sort((a, b) => projectMap[b].budget - projectMap[a].budget);
-        projects.forEach(proj => {
+        Object.keys(projectMap).sort((a, b) => projectMap[b].budget - projectMap[a].budget).forEach(proj => {
             const p = projectMap[proj];
             const pct = p.budget > 0 ? (p.actual / p.budget * 100) : 0;
-            const pctClass = pct > 90 ? 'high' : pct > 60 ? 'mid' : 'low';
-            const barClass = pct > 90 ? 'high' : pct > 60 ? 'mid' : 'low';
+            const cInfo = this._pctColor(pct);
             const remain = p.budget - p.actual;
 
-            html += `<div class="progress-item">
-                <div class="progress-header">
-                    <div class="progress-name">${this._esc(proj)}</div>
-                    <div class="progress-pct ${pctClass}">${pct.toFixed(1)}%</div>
+            html.push(`<div class="progress-item">
+                <div class="prog-head">
+                    <span class="prog-name">${this._esc(proj)}</span>
+                    <span class="prog-pct" style="color:${cInfo.color}">${pct.toFixed(1)}%</span>
                 </div>
-                <div class="progress-bar-track">
-                    <div class="progress-bar-fill ${barClass}" style="width:${Math.min(pct, 100)}%"></div>
+                <div class="prog-track">
+                    <div class="prog-fill" style="width:${Math.min(pct, 100)}%;background:${cInfo.grad}"></div>
                 </div>
-                <div class="progress-stats">
-                    <span><i class="dot budget-dot"></i>预算 ${this._fmt(p.budget)}</span>
-                    <span><i class="dot actual-dot"></i>实际 ${this._fmt(p.actual)}</span>
-                    <span><i class="dot remain-dot"></i>剩余 ${this._fmt(remain)}</span>
+                <div class="prog-stats">
+                    <span>预算 <b>${this._fmt(p.budget)}</b></span>
+                    <span>实际 <b>${this._fmt(p.actual)}</b></span>
+                    <span>剩余 <b style="color:${remain >= 0 ? '#52c41a' : '#ff4d4f'}">${this._fmt(remain)}</b></span>
                 </div>
-            </div>`;
+            </div>`);
         });
-        html += '</div></div>';
+        html.push('</div></div>');
 
-        // Progress by owner (ring chart)
+        // Owner ring charts
         const ownerMap = {};
         budgetData.forEach(row => {
             const owner = row.owner || '未分配';
             if (!ownerMap[owner]) ownerMap[owner] = { budget: 0, actual: 0 };
-            for (let m = 1; m <= 12; m++) {
-                ownerMap[owner].budget += row.monthly[`month_${m}`] || 0;
-            }
+            for (let m = 1; m <= 12; m++) ownerMap[owner].budget += row.monthly[`month_${m}`] || 0;
         });
         actualsData.forEach(row => {
             const owner = row.owner || '未分配';
             if (!ownerMap[owner]) ownerMap[owner] = { budget: 0, actual: 0 };
-            for (let m = 1; m <= 12; m++) {
-                ownerMap[owner].actual += row.monthly[`month_${m}`] || 0;
-            }
+            for (let m = 1; m <= 12; m++) ownerMap[owner].actual += row.monthly[`month_${m}`] || 0;
         });
 
-        html += '<div class="summary-section">';
-        html += '<div class="section-title"><span class="icon">&#9673;</span> 各负责人预算使用进度</div>';
-        html += '<div class="ring-grid">';
+        html.push('<div class="summary-section">');
+        html.push('<div class="sec-title">各负责人预算使用进度</div>');
+        html.push('<div class="ring-grid">');
 
-        const owners = Object.keys(ownerMap).sort((a, b) => ownerMap[b].budget - ownerMap[a].budget);
-        const R = 52, SW = 9, C = 2 * Math.PI * R;
+        const R = 54, SW = 10, C = 2 * Math.PI * R;
 
-        owners.forEach(owner => {
+        Object.keys(ownerMap).sort((a, b) => ownerMap[b].budget - ownerMap[a].budget).forEach((owner, idx) => {
             const o = ownerMap[owner];
             const pct = o.budget > 0 ? (o.actual / o.budget * 100) : 0;
-            const color = pct > 90 ? '#ff4d4f' : pct > 60 ? '#faad14' : '#52c41a';
-            const offset = C - (Math.min(pct, 100) / 100) * C;
+            const cInfo = this._pctColor(pct);
+            const offset = C * (1 - Math.min(pct, 100) / 100);
             const remain = o.budget - o.actual;
+            const uid = 'rg' + idx;
 
-            html += `<div class="ring-item">
-                <div class="ring-svg-wrap">
-                    <svg viewBox="0 0 128 128" width="128" height="128">
-                        <circle cx="64" cy="64" r="${R}" fill="none" stroke="#f0f0f0" stroke-width="${SW}"/>
-                        <circle cx="64" cy="64" r="${R}" fill="none" stroke="${color}" stroke-width="${SW}"
-                            stroke-dasharray="${C}" stroke-dashoffset="${offset}"
-                            stroke-linecap="round" transform="rotate(-90 64 64)"
-                            style="transition: stroke-dashoffset 0.6s ease"/>
-                        <text x="64" y="58" text-anchor="middle" font-size="20" font-weight="700" fill="${color}">${pct.toFixed(1)}</text>
-                        <text x="64" y="76" text-anchor="middle" font-size="11" fill="#999">%</text>
-                    </svg>
-                </div>
+            html.push(`<div class="ring-item">
+                <svg viewBox="0 0 140 140" width="140" height="140">
+                    <defs>
+                        <linearGradient id="${uid}" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="${cInfo.c1}"/>
+                            <stop offset="100%" stop-color="${cInfo.c2}"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="70" cy="70" r="${R}" fill="none" stroke="#f0f0f0" stroke-width="${SW}"/>
+                    <circle cx="70" cy="70" r="${R}" fill="none" stroke="url(#${uid})" stroke-width="${SW}"
+                        stroke-dasharray="${C}" stroke-dashoffset="${offset}"
+                        stroke-linecap="round" transform="rotate(-90 70 70)"/>
+                    <text x="70" y="65" text-anchor="middle" font-size="22" font-weight="800" fill="${cInfo.color}">${pct.toFixed(1)}</text>
+                    <text x="70" y="84" text-anchor="middle" font-size="12" fill="#bbb">%</text>
+                </svg>
                 <div class="ring-name">${this._esc(owner)}</div>
-                <div class="ring-stats">
-                    <span>预算 ${this._fmt(o.budget)}</span>
-                    <span>实际 ${this._fmt(o.actual)}</span>
-                    <span>剩余 ${this._fmt(remain)}</span>
+                <div class="ring-meta">
+                    <div class="ring-meta-row"><span>预算</span><b>${this._fmt(o.budget)}</b></div>
+                    <div class="ring-meta-row"><span>实际</span><b>${this._fmt(o.actual)}</b></div>
+                    <div class="ring-meta-row"><span>剩余</span><b style="color:${remain >= 0 ? '#52c41a' : '#ff4d4f'}">${this._fmt(remain)}</b></div>
                 </div>
-            </div>`;
+            </div>`);
         });
-        html += '</div></div>';
+        html.push('</div></div>');
 
         // Monthly bar chart
-        html += '<div class="summary-section">';
-        html += '<div class="section-title"><span class="icon">&#9636;</span> 月度预算 vs 实际对比</div>';
-        html += '<div class="chart-container">';
-        html += '<div class="chart-legend">';
-        html += '<div class="legend-item"><div class="legend-color budget"></div>预算</div>';
-        html += '<div class="legend-item"><div class="legend-color actual"></div>实际</div>';
-        html += '</div>';
+        html.push('<div class="summary-section">');
+        html.push('<div class="sec-title">月度预算 vs 实际对比</div>');
+        html.push('<div class="chart-wrap">');
+        html.push('<div class="chart-legend">');
+        html.push('<span class="chart-legend-item"><i style="background:linear-gradient(180deg,#5b8def,#3370ff)"></i>预算</span>');
+        html.push('<span class="chart-legend-item"><i style="background:linear-gradient(180deg,#67e35c,#36c14e)"></i>实际</span>');
+        html.push('</div>');
 
-        // Find max value for scaling
         let maxVal = 0;
-        for (let m = 1; m <= 12; m++) {
-            maxVal = Math.max(maxVal, monthlyBudget[m], monthlyActual[m]);
-        }
+        for (let m = 1; m <= 12; m++) maxVal = Math.max(maxVal, monthlyBudget[m], monthlyActual[m]);
         if (maxVal === 0) maxVal = 1;
 
-        html += '<div class="bar-chart">';
+        html.push('<div class="bar-chart">');
         for (let m = 1; m <= 12; m++) {
-            const bH = (monthlyBudget[m] / maxVal * 220);
-            const aH = (monthlyActual[m] / maxVal * 220);
-            html += `<div class="bar-group">
+            const bH = Math.max(monthlyBudget[m] / maxVal * 220, 2);
+            const aH = Math.max(monthlyActual[m] / maxVal * 220, 2);
+            html.push(`<div class="bar-group">
                 <div class="bar-pair">
-                    <div class="bar budget-bar" style="height:${Math.max(bH, 2)}px">
-                        <div class="bar-tooltip">预算: ${this._fmt(monthlyBudget[m])}</div>
-                    </div>
-                    <div class="bar actual-bar" style="height:${Math.max(aH, 2)}px">
-                        <div class="bar-tooltip">实际: ${this._fmt(monthlyActual[m])}</div>
-                    </div>
+                    <div class="bar budget-bar" style="height:${bH}px"><div class="bar-tip">预算<br>${this._fmt(monthlyBudget[m])}</div></div>
+                    <div class="bar actual-bar" style="height:${aH}px"><div class="bar-tip">实际<br>${this._fmt(monthlyActual[m])}</div></div>
                 </div>
-            </div>`;
+            </div>`);
         }
-        html += '</div>';
+        html.push('</div>');
 
-        html += '<div class="bar-labels">';
-        for (let m = 1; m <= 12; m++) {
-            html += `<div class="bar-label">${m}月</div>`;
-        }
-        html += '</div>';
+        html.push('<div class="bar-labels">');
+        for (let m = 1; m <= 12; m++) html.push(`<div class="bar-label">${m}月</div>`);
+        html.push('</div>');
 
-        html += '</div></div>';
+        html.push('</div></div>');
 
-        container.innerHTML = html;
+        container.innerHTML = html.join('');
+    },
+
+    _pctColor(pct) {
+        if (pct > 100) return { color: '#cf1322', grad: 'linear-gradient(90deg,#ff4d4f,#cf1322)', c1: '#ff4d4f', c2: '#cf1322' };
+        if (pct > 90)  return { color: '#fa541c', grad: 'linear-gradient(90deg,#ff7a45,#fa541c)', c1: '#ff7a45', c2: '#fa541c' };
+        if (pct > 75)  return { color: '#fa8c16', grad: 'linear-gradient(90deg,#ffc069,#fa8c16)', c1: '#ffc069', c2: '#fa8c16' };
+        if (pct > 50)  return { color: '#fadb14', grad: 'linear-gradient(90deg,#fff1b8,#fadb14)', c1: '#fff1b8', c2: '#fadb14' };
+        if (pct > 25)  return { color: '#52c41a', grad: 'linear-gradient(90deg,#95de64,#52c41a)', c1: '#95de64', c2: '#52c41a' };
+        return { color: '#1890ff', grad: 'linear-gradient(90deg,#69c0ff,#1890ff)', c1: '#69c0ff', c2: '#1890ff' };
     },
 
     // ===== Table Rendering =====
