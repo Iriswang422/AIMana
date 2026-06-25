@@ -58,7 +58,7 @@
                 <div class="section-header">
                     <h2>预算编辑面板</h2>
                     <div class="header-actions">
-                        <button id="import-excel-btn" class="btn btn-secondary btn-sm">📥 导入 Excel</button>
+                        <button id="import-excel-btn" class="btn btn-secondary btn-sm" onclick="document.getElementById('import-section').style.display='block'">📥 导入 Excel</button>
                         <button id="add-owner-btn" class="btn btn-primary btn-sm">+ 添加负责人</button>
                     </div>
                 </div>
@@ -71,8 +71,8 @@
                     </p>
                     <div class="upload-area">
                         <input type="file" id="budget-import-file" accept=".xlsx,.xls">
-                        <button id="preview-import-btn" class="btn btn-secondary">预览</button>
-                        <button id="confirm-import-btn" class="btn btn-primary">确认导入</button>
+                        <button id="preview-import-btn" class="btn btn-secondary" onclick="BudgetApp.handleBudgetImportPreview()">预览</button>
+                        <button id="confirm-import-btn" class="btn btn-primary" onclick="BudgetApp.handleBudgetImport()">确认导入</button>
                         <button class="btn" onclick="document.getElementById('import-section').style.display='none'">取消</button>
                     </div>
                     <div id="import-status" style="margin-top:10px;"></div>
@@ -128,8 +128,8 @@
 
                     <div class="upload-area">
                         <input type="file" id="actuals-upload-file" accept=".xlsx,.xls">
-                        <button id="preview-actuals-btn" class="btn btn-secondary">预览数据</button>
-                        <button id="upload-actuals-btn" class="btn btn-primary">确认上传</button>
+                        <button id="preview-actuals-btn" class="btn btn-secondary" onclick="BudgetApp.handleActualsPreview()">预览数据</button>
+                        <button id="upload-actuals-btn" class="btn btn-primary" onclick="BudgetApp.handleActualsUpload()">确认上传</button>
                     </div>
 
                     <div id="actuals-upload-status" style="margin-top:15px;"></div>
