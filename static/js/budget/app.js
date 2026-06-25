@@ -133,15 +133,14 @@ const BudgetApp = {
     },
 
     _updateComparisonSummary() {
-        const totalB = this.data.reduce((s, r) => s + (r.total_budget || 0), 0);
-        const totalA = this.data.reduce((s, r) => s + (r.total_actual || 0), 0);
-        const diff = totalA - totalB;
+        const totals = this._compTotals();
+        const diff = totals.grandActual - totals.grandBudget;
         const diffClass = diff > 0 ? 'risk-p0' : diff < 0 ? 'neg' : '';
         const monthLabel = this.filters.month ? `${this.filters.month}月` : '全年';
         document.getElementById('comparison-summary').innerHTML =
             `<span>${monthLabel} | 共 <strong>${this.data.length}</strong> 条</span>
-             <span>合计预算: <strong>${this._fmt(totalB)}</strong></span>
-             <span>合计实际: <strong>${this._fmt(totalA)}</strong></span>
+             <span>合计预算: <strong>${this._fmt(totals.grandBudget)}</strong></span>
+             <span>合计实际: <strong>${this._fmt(totals.grandActual)}</strong></span>
              <span>合计差异: <strong class="${diffClass}">${this._fmt(diff)}</strong></span>`;
     },
 
@@ -192,6 +191,9 @@ const BudgetApp = {
         const tbody = table.querySelector('tbody');
         const tfoot = table.querySelector('tfoot');
 
+        const selMonth = this.filters.month ? parseInt(this.filters.month) : null;
+        const monthsToShow = selMonth ? [selMonth] : [1,2,3,4,5,6,7,8,9,10,11,12];
+
         thead.innerHTML = '';
         const tr1 = document.createElement('tr');
         ['项目','Tag','业务场景','负责人'].forEach(h => {
@@ -201,13 +203,13 @@ const BudgetApp = {
             th.textContent = h;
             tr1.appendChild(th);
         });
-        for (let m = 1; m <= 12; m++) {
+        monthsToShow.forEach(m => {
             const th = document.createElement('th');
             th.colSpan = 4;
-            if (this.filters.month && parseInt(this.filters.month) === m) th.className = 'highlight-col';
+            if (selMonth === m) th.className = 'highlight-col';
             th.textContent = m + '月';
             tr1.appendChild(th);
-        }
+        });
         const totalTh = document.createElement('th');
         totalTh.rowSpan = 2;
         totalTh.textContent = '合计差异';
@@ -215,14 +217,14 @@ const BudgetApp = {
         thead.appendChild(tr1);
 
         const tr2 = document.createElement('tr');
-        for (let m = 1; m <= 12; m++) {
+        monthsToShow.forEach(m => {
             ['预算','实际','差异','解释'].forEach(h => {
                 const th = document.createElement('th');
-                if (this.filters.month && parseInt(this.filters.month) === m) th.className = 'highlight-col';
+                if (selMonth === m) th.className = 'highlight-col';
                 th.textContent = h;
                 tr2.appendChild(th);
             });
-        }
+        });
         thead.appendChild(tr2);
 
         tbody.innerHTML = '';
@@ -238,9 +240,9 @@ const BudgetApp = {
                 tr.appendChild(td);
             });
             const monthly = row.monthly || {};
-            for (let m = 1; m <= 12; m++) {
+            monthsToShow.forEach(m => {
                 const md = monthly['month_' + m] || {};
-                const hl = this.filters.month && parseInt(this.filters.month) === m;
+                const hl = selMonth === m;
 
                 const tdB = document.createElement('td');
                 if (hl) tdB.className = 'highlight-col';
@@ -268,7 +270,7 @@ const BudgetApp = {
                 tdN.title = md.note || '点击添加差异解释';
                 tdN.textContent = md.note ? this._truncate(md.note, 20) : '+';
                 tr.appendChild(tdN);
-            }
+            });
             const totalDiff = row.total_diff || 0;
             const tdTotal = document.createElement('td');
             tdTotal.className = 'total-col';
@@ -290,8 +292,8 @@ const BudgetApp = {
         tdLabel.colSpan = 4;
         tdLabel.textContent = '合计';
         trFoot.appendChild(tdLabel);
-        for (let m = 1; m <= 12; m++) {
-            const hl = this.filters.month && parseInt(this.filters.month) === m;
+        monthsToShow.forEach(m => {
+            const hl = selMonth === m;
             [totals.budgets[m], totals.actuals[m], totals.diffs[m]].forEach(v => {
                 const td = document.createElement('td');
                 if (hl) td.className = 'highlight-col';
@@ -301,7 +303,7 @@ const BudgetApp = {
             const tdEmpty = document.createElement('td');
             if (hl) tdEmpty.className = 'highlight-col';
             trFoot.appendChild(tdEmpty);
-        }
+        });
         const tdGrand = document.createElement('td');
         tdGrand.className = 'total-col';
         if (totals.grandDiff > 0) tdGrand.className += ' risk-p0';
@@ -368,9 +370,12 @@ const BudgetApp = {
         const budgets = {}, actuals = {}, diffs = {};
         for (let m = 1; m <= 12; m++) { budgets[m] = 0; actuals[m] = 0; diffs[m] = 0; }
         let grandBudget = 0, grandActual = 0;
+        const selMonth = this.filters.month ? parseInt(this.filters.month) : null;
         this.data.forEach(row => {
+            const monthly = row.monthly || {};
             for (let m = 1; m <= 12; m++) {
-                const md = row.monthly[`month_${m}`] || {};
+                if (selMonth && selMonth !== m) continue;
+                const md = monthly['month_' + m] || {};
                 budgets[m] += md.budget || 0;
                 actuals[m] += md.actual || 0;
                 diffs[m] += md.diff || 0;
