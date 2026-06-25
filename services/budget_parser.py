@@ -44,33 +44,24 @@ class BudgetExcelParser:
         return result
 
     def _get_base_key(self, row):
-        def _val(field):
-            v = row.get(field, '')
-            if pd.isna(v):
-                return ''
-            return str(v).strip()
-        project = _val('项目')
-        tag = _val('Tag')
-        business_scene = _val('业务场景')
-        vendor = _val('供应商')
-        detail = _val('明细')
-        owner = _val('负责人')
+        project = str(row.get('项目', '')).strip()
+        tag = str(row.get('Tag', '')).strip()
+        business_scene = str(row.get('业务场景', '')).strip()
+        vendor = str(row.get('供应商', '')).strip()
+        detail = str(row.get('明细', '')).strip()
+        owner = str(row.get('负责人', '')).strip()
         return (project, tag, business_scene, vendor, detail, owner)
 
     def _is_summary_row(self, row):
         project = row.get('项目', '')
-        if pd.isna(project):
+        project_str = str(project).strip() if project is not None and str(project) != 'nan' else ''
+        if not project_str:
             return True
-        project = str(project).strip()
-        if not project or project == 'nan':
-            return True
-        if '合计' in project or '小计' in project:
+        if '合计' in project_str or '小计' in project_str:
             return True
         detail = row.get('明细', '')
-        if pd.isna(detail):
-            return True
-        detail = str(detail).strip()
-        if not detail or detail == 'nan':
+        detail_str = str(detail).strip() if detail is not None and str(detail) != 'nan' else ''
+        if not detail_str:
             return True
         return False
 
