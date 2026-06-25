@@ -195,6 +195,11 @@ class BudgetService:
         perm = Permission(user_id=user_id, role=role, owner_id=owner_id, feishu_group=feishu_group)
         return self.repo.save_permission(perm)
 
+    # ===== 实际数管理 =====
+    def get_all_actuals(self):
+        """获取所有实际数记录（含负责人、板块、明细名称）"""
+        return self.repo.get_all_actuals_with_details()
+
     # ===== 初始化示例数据 =====
     def init_sample_data(self):
         """初始化FY26真实预算数据（从Excel提取）"""
