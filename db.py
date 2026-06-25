@@ -15,6 +15,7 @@ SERIAL_COLUMNS = {
     'actual_monthly': 'id',
     'budget_change_log': 'id',
     'risk_rules': 'id',
+    'variance_notes': 'id',
     'reports': 'id',
     'report_data': 'id',
     'report_kpis': 'id',
