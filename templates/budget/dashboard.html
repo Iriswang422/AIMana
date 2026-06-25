@@ -11,14 +11,15 @@
         <header class="budget-header">
             <h1>AI体验中心预算追踪</h1>
             <div class="header-actions">
-                <select id="filter-project" class="filter-select">
-                    <option value="">全部项目</option>
-                </select>
-                <select id="filter-tag" class="filter-select">
-                    <option value="">全部Tag</option>
-                </select>
-                <select id="filter-owner" class="filter-select">
-                    <option value="">全部负责人</option>
+                <select id="filter-project" class="filter-select"><option value="">全部项目</option></select>
+                <select id="filter-tag" class="filter-select"><option value="">全部Tag</option></select>
+                <select id="filter-owner" class="filter-select"><option value="">全部负责人</option></select>
+                <select id="filter-month" class="filter-select">
+                    <option value="">全部月份</option>
+                    <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+                    <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+                    <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+                    <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
                 </select>
                 <button id="import-btn" class="btn btn-primary">导入Excel</button>
                 <button id="refresh-btn" class="btn btn-icon" title="刷新">&#x21bb;</button>
@@ -31,32 +32,46 @@
             <button class="tab-btn" data-tab="actuals">实际数</button>
         </nav>
 
+        <div id="risk-legend" class="risk-legend" style="display:none;">
+            <span class="legend-title">风险定义：</span>
+            <span class="legend-item risk-p0-bg">P0 超支：实际超预算5%以上</span>
+            <span class="legend-item risk-p1-bg">P1 未用满：使用率不足90%</span>
+            <span class="legend-item risk-p2-bg">P2 未使用：有预算但无实际支出</span>
+            <span class="legend-item risk-p3-bg">P3 预算内：正常范围</span>
+        </div>
+
         <div id="risk-summary" class="risk-summary" style="display:none;"></div>
 
         <main class="tab-content">
             <div id="budget-tab" class="tab-pane active">
+                <div class="summary-bar" id="budget-summary"></div>
                 <div class="table-scroll">
                     <table id="budget-table" class="excel-table">
                         <thead><tr></tr></thead>
                         <tbody></tbody>
+                        <tfoot></tfoot>
                     </table>
                 </div>
             </div>
 
             <div id="comparison-tab" class="tab-pane">
+                <div class="summary-bar" id="comparison-summary"></div>
                 <div class="table-scroll">
                     <table id="comparison-table" class="excel-table">
                         <thead><tr></tr></thead>
                         <tbody></tbody>
+                        <tfoot></tfoot>
                     </table>
                 </div>
             </div>
 
             <div id="actuals-tab" class="tab-pane">
+                <div class="summary-bar" id="actuals-summary"></div>
                 <div class="table-scroll">
                     <table id="actuals-table" class="excel-table">
                         <thead><tr></tr></thead>
                         <tbody></tbody>
+                        <tfoot></tfoot>
                     </table>
                 </div>
             </div>
@@ -78,14 +93,15 @@
         </div>
     </div>
 
-    <div id="reason-modal" class="modal" style="display:none;">
+    <div id="note-modal" class="modal" style="display:none;">
         <div class="modal-content">
-            <h3>编辑变动理由</h3>
-            <p id="reason-context"></p>
-            <textarea id="reason-input" rows="3" placeholder="请输入变动理由..."></textarea>
+            <h3>差异解释</h3>
+            <p id="note-context"></p>
+            <textarea id="note-input" rows="4" placeholder="请输入差异解释（支持协作编辑，保存后对所有人可见）..."></textarea>
+            <p class="note-meta" id="note-meta"></p>
             <div class="modal-actions">
-                <button id="save-reason-btn" class="btn btn-primary">保存</button>
-                <button class="btn" onclick="document.getElementById('reason-modal').style.display='none'">取消</button>
+                <button id="save-note-btn" class="btn btn-primary">保存</button>
+                <button class="btn" onclick="document.getElementById('note-modal').style.display='none'">取消</button>
             </div>
         </div>
     </div>
