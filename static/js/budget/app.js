@@ -192,53 +192,123 @@ const BudgetApp = {
         const tbody = table.querySelector('tbody');
         const tfoot = table.querySelector('tfoot');
 
-        let headerRow1 = '<tr><th rowspan="2" class="base-col">项目</th><th rowspan="2" class="base-col">Tag</th><th rowspan="2" class="base-col">业务场景</th><th rowspan="2" class="base-col">负责人</th>';
-        let headerRow2 = '<tr>';
+        thead.innerHTML = '';
+        const tr1 = document.createElement('tr');
+        ['项目','Tag','业务场景','负责人'].forEach(h => {
+            const th = document.createElement('th');
+            th.className = 'base-col';
+            th.rowSpan = 2;
+            th.textContent = h;
+            tr1.appendChild(th);
+        });
         for (let m = 1; m <= 12; m++) {
-            const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
-            headerRow1 += `<th colspan="4" class="${hl}">${m}月</th>`;
-            headerRow2 += `<th class="${hl}">预算</th><th class="${hl}">实际</th><th class="${hl}">差异</th><th class="${hl}">解释</th>`;
+            const th = document.createElement('th');
+            th.colSpan = 4;
+            if (this.filters.month && parseInt(this.filters.month) === m) th.className = 'highlight-col';
+            th.textContent = m + '月';
+            tr1.appendChild(th);
         }
-        headerRow1 += '<th rowspan="2">合计差异</th></tr>';
-        headerRow2 += '</tr>';
-        thead.innerHTML = headerRow1 + headerRow2;
+        const totalTh = document.createElement('th');
+        totalTh.rowSpan = 2;
+        totalTh.textContent = '合计差异';
+        tr1.appendChild(totalTh);
+        thead.appendChild(tr1);
 
-        if (!this.data || !Array.isArray(this.data)) {
-            tbody.innerHTML = '';
-            return;
+        const tr2 = document.createElement('tr');
+        for (let m = 1; m <= 12; m++) {
+            ['预算','实际','差异','解释'].forEach(h => {
+                const th = document.createElement('th');
+                if (this.filters.month && parseInt(this.filters.month) === m) th.className = 'highlight-col';
+                th.textContent = h;
+                tr2.appendChild(th);
+            });
         }
+        thead.appendChild(tr2);
 
-        tbody.innerHTML = this.data.map(row => {
-            const base = [row.project, row.tag, row.business_scene, row.owner]
-                .map(v => `<td class="base-col">${this._esc(v)}</td>`).join('');
-            const months = [];
+        tbody.innerHTML = '';
+        if (!this.data || !Array.isArray(this.data)) return;
+
+        const frag = document.createDocumentFragment();
+        this.data.forEach(row => {
+            const tr = document.createElement('tr');
+            [row.project, row.tag, row.business_scene, row.owner].forEach(v => {
+                const td = document.createElement('td');
+                td.className = 'base-col';
+                td.textContent = v || '';
+                tr.appendChild(td);
+            });
             const monthly = row.monthly || {};
             for (let m = 1; m <= 12; m++) {
-                const md = monthly[`month_${m}`] || {};
-                const riskClass = md.risk ? `risk-${md.risk.toLowerCase()}` : '';
-                const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
-                const noteIcon = md.note ? ' has-note' : '';
-                const noteTitle = this._esc(md.note) || '点击添加差异解释';
-                months.push(
-                    `<td class="${hl}">${this._fmt(md.budget)}</td>`,
-                    `<td class="editable${hl}" data-item-id="${row.id}" data-month="${m}" data-type="actual">${this._fmt(md.actual)}</td>`,
-                    `<td class="${riskClass}${hl}">${this._fmt(md.diff)}</td>`,
-                    `<td class="note-cell${noteIcon}${hl}" data-item-id="${row.id}" data-month="${m}" title="${noteTitle}">${md.note ? this._truncate(md.note, 20) : '<span class="add-note">+</span>'}</td>`
-                );
+                const md = monthly['month_' + m] || {};
+                const hl = this.filters.month && parseInt(this.filters.month) === m;
+
+                const tdB = document.createElement('td');
+                if (hl) tdB.className = 'highlight-col';
+                tdB.textContent = this._fmt(md.budget);
+                tr.appendChild(tdB);
+
+                const tdA = document.createElement('td');
+                tdA.className = 'editable' + (hl ? ' highlight-col' : '');
+                tdA.dataset.itemId = row.id;
+                tdA.dataset.month = m;
+                tdA.dataset.type = 'actual';
+                tdA.textContent = this._fmt(md.actual);
+                tr.appendChild(tdA);
+
+                const tdD = document.createElement('td');
+                if (md.risk) tdD.className = 'risk-' + md.risk.toLowerCase();
+                if (hl) tdD.className += (tdD.className ? ' ' : '') + 'highlight-col';
+                tdD.textContent = this._fmt(md.diff);
+                tr.appendChild(tdD);
+
+                const tdN = document.createElement('td');
+                tdN.className = 'note-cell' + (md.note ? ' has-note' : '') + (hl ? ' highlight-col' : '');
+                tdN.dataset.itemId = row.id;
+                tdN.dataset.month = m;
+                tdN.title = md.note || '点击添加差异解释';
+                tdN.textContent = md.note ? this._truncate(md.note, 20) : '+';
+                tr.appendChild(tdN);
             }
             const totalDiff = row.total_diff || 0;
-            const diffClass = totalDiff > 0 ? 'risk-p0' : (totalDiff < 0 ? 'risk-p2' : '');
-            return `<tr>${base}${months.join('')}<td class="${diffClass} total-col">${this._fmt(totalDiff)}</td></tr>`;
-        }).join('');
+            const tdTotal = document.createElement('td');
+            tdTotal.className = 'total-col';
+            if (totalDiff > 0) tdTotal.className += ' risk-p0';
+            else if (totalDiff < 0) tdTotal.className += ' risk-p2';
+            tdTotal.textContent = this._fmt(totalDiff);
+            tr.appendChild(tdTotal);
 
+            frag.appendChild(tr);
+        });
+        tbody.appendChild(frag);
+
+        tfoot.innerHTML = '';
         const totals = this._compTotals();
-        let tfootMonths = '';
+        const trFoot = document.createElement('tr');
+        trFoot.className = 'total-row';
+        const tdLabel = document.createElement('td');
+        tdLabel.className = 'base-col';
+        tdLabel.colSpan = 4;
+        tdLabel.textContent = '合计';
+        trFoot.appendChild(tdLabel);
         for (let m = 1; m <= 12; m++) {
-            const hl = this.filters.month && parseInt(this.filters.month) === m ? ' highlight-col' : '';
-            tfootMonths += `<td class="${hl}">${this._fmt(totals.budgets[m])}</td><td class="${hl}">${this._fmt(totals.actuals[m])}</td><td class="${hl}">${this._fmt(totals.diffs[m])}</td><td class="${hl}"></td>`;
+            const hl = this.filters.month && parseInt(this.filters.month) === m;
+            [totals.budgets[m], totals.actuals[m], totals.diffs[m]].forEach(v => {
+                const td = document.createElement('td');
+                if (hl) td.className = 'highlight-col';
+                td.textContent = this._fmt(v);
+                trFoot.appendChild(td);
+            });
+            const tdEmpty = document.createElement('td');
+            if (hl) tdEmpty.className = 'highlight-col';
+            trFoot.appendChild(tdEmpty);
         }
-        const totalDiffClass = totals.grandDiff > 0 ? 'risk-p0' : (totals.grandDiff < 0 ? 'risk-p2' : '');
-        tfoot.innerHTML = `<tr class="total-row"><td class="base-col" colspan="4">合计</td>${tfootMonths}<td class="${totalDiffClass} total-col">${this._fmt(totals.grandDiff)}</td></tr>`;
+        const tdGrand = document.createElement('td');
+        tdGrand.className = 'total-col';
+        if (totals.grandDiff > 0) tdGrand.className += ' risk-p0';
+        else if (totals.grandDiff < 0) tdGrand.className += ' risk-p2';
+        tdGrand.textContent = this._fmt(totals.grandDiff);
+        trFoot.appendChild(tdGrand);
+        tfoot.appendChild(trFoot);
 
         tbody.querySelectorAll('.editable').forEach(td => {
             td.addEventListener('click', () => this.editActualCell(td));
