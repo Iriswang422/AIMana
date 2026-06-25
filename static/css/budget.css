@@ -442,6 +442,59 @@ body {
 .dot.actual-dot { background: #52c41a; }
 .dot.remain-dot { background: #d9d9d9; }
 
+/* Ring chart for owner progress */
+.ring-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: flex-start;
+}
+
+.ring-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 140px;
+    padding: 12px 8px;
+    border: 1px solid #f0f0f0;
+    border-radius: 10px;
+    transition: box-shadow 0.2s;
+}
+
+.ring-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.ring-svg-wrap {
+    margin-bottom: 8px;
+}
+
+.ring-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-align: center;
+    margin-bottom: 6px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ring-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+    color: #8c8c8c;
+    width: 100%;
+}
+
+.ring-stats span {
+    display: flex;
+    justify-content: space-between;
+}
+
 /* Bar Chart */
 .chart-container {
     padding: 10px 0;
