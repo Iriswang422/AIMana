@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>竞技工作室经营月报</title>
+    <link rel="stylesheet" href="/static/css/report.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- 头部 -->
+        <header class="dashboard-header">
+            <div class="header-left">
+                <h1>竞技工作室经营月报</h1>
+            </div>
+            <div class="header-right">
+                <select id="period-selector" class="period-select">
+                    <option value="">选择期间...</option>
+                </select>
+                <button id="refresh-btn" class="btn btn-icon" title="刷新">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+                        <path d="M21 3v5h-5"/>
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+                        <path d="M3 21v-5h5"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- 标签页导航 -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="summary">概览</button>
+            <button class="tab-btn" data-tab="budget">预实对比</button>
+            <button class="tab-btn" data-tab="projects">项目分析</button>
+            <button class="tab-btn" data-tab="revenue">收入实收</button>
+            <button class="tab-btn" data-tab="cost">费用</button>
+            <button class="tab-btn" data-tab="labor">人力</button>
+            <button class="tab-btn" data-tab="admin">设置</button>
+        </nav>
+
+        <!-- 内容区 -->
+        <main class="tab-content">
+            <!-- 概览 -->
+            <div id="summary-tab" class="tab-pane active">
+                <div class="kpi-grid" id="kpi-grid"></div>
+                <div class="section">
+                    <h2>关键要点</h2>
+                    <div id="highlights-list" class="highlights-list"></div>
+                </div>
+            </div>
+
+            <!-- 预实对比 -->
+            <div id="budget-tab" class="tab-pane">
+                <div class="chart-container">
+                    <h3>总体预实对比</h3>
+                    <div id="budget-overview-chart" class="chart"></div>
+                </div>
+                <div class="chart-container">
+                    <h3>各项目预实对比</h3>
+                    <div id="budget-projects-chart" class="chart"></div>
+                </div>
+                <div class="table-container">
+                    <h3>详细数据</h3>
+                    <table id="budget-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>指标</th>
+                                <th>实际</th>
+                                <th>预算</th>
+                                <th>差异</th>
+                                <th>达成率</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 项目分析 -->
+            <div id="projects-tab" class="tab-pane">
+                <div class="project-selector">
+                    <label>选择项目：</label>
+                    <select id="project-filter" class="filter-select">
+                        <option value="">全部项目</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <h3>项目多维度分析</h3>
+                    <div id="project-radar-chart" class="chart"></div>
+                </div>
+                <div class="table-container">
+                    <h3>项目详情</h3>
+                    <table id="projects-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>项目</th>
+                                <th>收入实际</th>
+                                <th>收入预算</th>
+                                <th>达成率</th>
+                                <th>成本实际</th>
+                                <th>成本预算</th>
+                                <th>HC</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 收入实收 -->
+            <div id="revenue-tab" class="tab-pane">
+                <div class="chart-container">
+                    <h3>月度收入趋势</h3>
+                    <div id="revenue-trend-chart" class="chart"></div>
+                </div>
+                <div class="chart-container">
+                    <h3>实收率热力图</h3>
+                    <div id="collection-heatmap" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- 费用 -->
+            <div id="cost-tab" class="tab-pane">
+                <div class="chart-container">
+                    <h3>成本结构</h3>
+                    <div id="cost-treemap" class="chart"></div>
+                </div>
+                <div class="chart-container">
+                    <h3>服务器费用趋势</h3>
+                    <div id="server-cost-chart" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- 人力 -->
+            <div id="labor-tab" class="tab-pane">
+                <div class="chart-container">
+                    <h3>HC实际vs预算</h3>
+                    <div id="hc-chart" class="chart"></div>
+                </div>
+                <div class="chart-container">
+                    <h3>人均成本趋势</h3>
+                    <div id="avg-cost-chart" class="chart"></div>
+                </div>
+            </div>
+
+            <!-- 设置 -->
+            <div id="admin-tab" class="tab-pane">
+                <div class="section">
+                    <h2>上传新月度数据</h2>
+                    <div class="upload-area">
+                        <input type="file" id="report-file" accept=".xlsx,.xls">
+                        <input type="text" id="report-period" placeholder="期间，如：FY26-05">
+                        <input type="text" id="report-title" placeholder="报告标题（可选）">
+                        <button id="upload-btn" class="btn btn-primary">上传并解析</button>
+                    </div>
+                    <div id="upload-status"></div>
+                </div>
+                <div class="section">
+                    <h2>管理现有报告</h2>
+                    <table id="reports-table" class="data-table">
+                        <thead>
+                            <tr>
+                                <th>期间</th>
+                                <th>标题</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="section">
+                    <h2>下载模板</h2>
+                    <p>首次使用？下载Excel模板，按格式填写数据后上传。</p>
+                    <a href="/api/report/template" class="btn btn-secondary">下载模板文件</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/js/report/api.js"></script>
+    <script src="/static/js/report/charts.js"></script>
+    <script src="/static/js/report/app.js"></script>
+</body>
+</html>
