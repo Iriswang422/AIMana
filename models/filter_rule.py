@@ -1,13 +1,15 @@
-import sqlite3
+from db import get_connection, translate_create_table
 import json
 
+
 class FilterRule:
-    def __init__(self, db_path):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        pass
 
     def create_table(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS filter_rules (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -16,12 +18,12 @@ class FilterRule:
                 logic_operator TEXT DEFAULT 'AND',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        ''')
+        '''))
         conn.commit()
         conn.close()
 
     def save(self, name, conditions, logic_operator='AND', description=''):
-        conn = sqlite3.connect(self.db_path)
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO filter_rules (name, description, conditions, logic_operator)
@@ -33,32 +35,36 @@ class FilterRule:
         return rule_id
 
     def get_all(self):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        conn = get_connection()
+        conn.row_factory = True
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM filter_rules ORDER BY created_at DESC')
-        rules = [dict(row) for row in cursor.fetchall()]
+        rows = cursor.fetchall()
         conn.close()
-        for rule in rules:
-            rule['conditions'] = json.loads(rule['conditions'])
+        rules = []
+        for row in rows:
+            r = dict(row) if not isinstance(row, dict) else row
+            r['conditions'] = json.loads(r['conditions'])
+            rules.append(r)
         return rules
 
     def get_by_id(self, rule_id):
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
+        conn = get_connection()
+        conn.row_factory = True
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM filter_rules WHERE id = ?', (rule_id,))
         row = cursor.fetchone()
         conn.close()
         if row:
-            rule = dict(row)
+            rule = dict(row) if not isinstance(row, dict) else row
             rule['conditions'] = json.loads(rule['conditions'])
             return rule
         return None
 
     def update(self, rule_id, name, conditions, logic_operator='AND', description=''):
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('''
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
             UPDATE filter_rules
             SET name = ?, description = ?, conditions = ?, logic_operator = ?
             WHERE id = ?
@@ -67,7 +73,8 @@ class FilterRule:
         conn.close()
 
     def delete(self, rule_id):
-        conn = sqlite3.connect(self.db_path)
-        conn.execute('DELETE FROM filter_rules WHERE id = ?', (rule_id,))
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM filter_rules WHERE id = ?', (rule_id,))
         conn.commit()
         conn.close()
