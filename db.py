@@ -106,8 +106,6 @@ class Row:
 class PgCursorWrapper:
     def __init__(self, conn):
         self._conn = conn
-        from psycopg.rows import dict_row
-        conn.row_factory = dict_row
         self._cursor = conn.cursor()
         self._lastrowid = None
         self._description = None
