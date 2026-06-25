@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-import sqlite3
 import json
 from datetime import datetime
-from config import Config
+from db import get_connection, translate_create_table
 
 
 class Report:
@@ -73,17 +72,16 @@ class ReportKPI:
 
 class ReportRepository:
     def __init__(self):
-        self.db_path = Config.DATABASE_PATH
         self._init_tables()
 
     def _get_conn(self):
-        return sqlite3.connect(self.db_path)
+        return get_connection()
 
     def _init_tables(self):
         conn = self._get_conn()
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 period TEXT NOT NULL UNIQUE,
@@ -92,9 +90,9 @@ class ReportRepository:
                 created_at TEXT,
                 status TEXT DEFAULT 'draft'
             )
-        ''')
+        '''))
 
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS report_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 report_id INTEGER NOT NULL,
@@ -104,9 +102,9 @@ class ReportRepository:
                 UNIQUE(report_id, section, subsection),
                 FOREIGN KEY (report_id) REFERENCES reports(id)
             )
-        ''')
+        '''))
 
-        cursor.execute('''
+        cursor.execute(translate_create_table('''
             CREATE TABLE IF NOT EXISTS report_kpis (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 report_id INTEGER NOT NULL,
@@ -118,7 +116,7 @@ class ReportRepository:
                 unit TEXT,
                 FOREIGN KEY (report_id) REFERENCES reports(id)
             )
-        ''')
+        '''))
 
         conn.commit()
         conn.close()
