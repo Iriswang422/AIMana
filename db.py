@@ -119,14 +119,12 @@ class PgCursorWrapper:
         params = params or ()
         params = tuple(params)
 
-        upper = sql.strip().upper()
-
-        if upper.startswith('INSERT'):
+        if get_db_type() == 'postgresql':
             sql, params = self._convert_none_to_default(sql, params)
 
         translated = self._translate(sql, params)
 
-        if translated.startswith('INSERT') and 'RETURNING' not in translated.upper():
+        if translated.strip().upper().startswith('INSERT') and 'RETURNING' not in translated.upper():
             translated = translated.rstrip().rstrip(';') + ' RETURNING id'
 
         self._cursor.execute(translated, params)
@@ -151,20 +149,16 @@ class PgCursorWrapper:
         return self
 
     def _translate(self, sql, params):
+        if get_db_type() != 'postgresql':
+            return sql
         upper = sql.strip().upper()
-
         if upper.startswith('INSERT OR REPLACE'):
             return self._translate_upsert(sql, params)
-
-        if get_db_type() == 'postgresql' and '?' in sql:
-            sql = sql.replace('?', '%s')
-
-        return sql
+        return sql.replace('?', '%s')
 
     def _translate_upsert(self, sql, params):
         params = tuple(params)
-        if get_db_type() == 'postgresql':
-            sql = sql.replace('?', '%s')
+        sql = sql.replace('?', '%s')
 
         table_match = re.search(r'INTO\s+(\w+)', sql, re.IGNORECASE)
         if not table_match:
@@ -180,11 +174,6 @@ class PgCursorWrapper:
         unique_constraints = self._get_unique_constraints(table)
         pk_cols = self._get_pk_columns(table)
 
-        secondary = [
-            c for name, c in unique_constraints
-            if name != 'pk' and all(col in cols for col in c)
-        ]
-
         parts = ['BEGIN']
 
         if pk_cols and all(col in cols for col in pk_cols):
@@ -192,13 +181,17 @@ class PgCursorWrapper:
             for col in pk_cols:
                 idx = cols.index(col)
                 if idx < len(params) and params[idx] is not None:
-                    pk_ph.append('%s' if get_db_type() == 'postgresql' else '?')
+                    pk_ph.append('%s')
                 else:
                     pk_ph.append('NULL')
             if 'NULL' not in pk_ph:
                 where = ' AND '.join(f'{c} = {p}' for c, p in zip(pk_cols, pk_ph))
                 parts.append(f'DELETE FROM {table} WHERE {where}')
 
+        secondary = [
+            c for name, c in unique_constraints
+            if name != 'pk' and all(col in cols for col in c)
+        ]
         for constraint in secondary:
             phs = []
             all_none = True
@@ -206,7 +199,7 @@ class PgCursorWrapper:
                 idx = cols.index(col)
                 if idx < len(params):
                     if params[idx] is not None:
-                        phs.append('%s' if get_db_type() == 'postgresql' else '?')
+                        phs.append('%s')
                         all_none = False
                     else:
                         phs.append('NULL')
@@ -256,43 +249,59 @@ class PgCursorWrapper:
         if get_db_type() != 'postgresql':
             return sql, params
 
-        cols_match = re.search(r'INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+\w+\s*\(([^)]+)\)',
-                               sql, re.IGNORECASE)
+        upper = sql.strip().upper()
+        if not upper.startswith('INSERT'):
+            return sql, params
+
+        cols_match = re.search(
+            r'INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+\w+\s*\(([^)]+)\)',
+            sql, re.IGNORECASE)
         if not cols_match:
             return sql, params
+
+        table_match = re.search(r'INTO\s+(\w+)', sql, re.IGNORECASE)
+        if not table_match:
+            return sql, params
+        table = table_match.group(1).lower()
 
         cols_str = cols_match.group(1)
         cols = [c.strip().strip('"').lower() for c in cols_str.split(',')]
 
-        id_col = SERIAL_COLUMNS.get(
-            re.search(r'INTO\s+(\w+)', sql, re.IGNORECASE).group(1).lower(), 'id')
+        id_col = SERIAL_COLUMNS.get(table, 'id')
 
-        new_sql = sql
-        new_params = list(params)
-
+        none_indices = []
         for i, col in enumerate(cols):
-            if col == id_col.lower() and i < len(new_params) and new_params[i] is None:
-                pattern = re.compile(
-                    r'(VALUES\s*\(\s*NULL' if i == 0
-                    else r'(,\s*)NULL',
-                    re.IGNORECASE)
-                if i == 0:
-                    new_sql = re.sub(
-                        r'(VALUES\s*\(\s*)NULL',
-                        r'\1DEFAULT', new_sql, count=1, flags=re.IGNORECASE)
-                else:
-                    count = 0
-                    def replace_nth_comma_null(m):
-                        nonlocal count
-                        count += 1
-                        if count == i:
-                            return m.group(1) + 'DEFAULT'
-                        return m.group(0)
-                    new_sql = re.sub(r'(,\s*)NULL', replace_nth_comma_null,
-                                     new_sql, flags=re.IGNORECASE)
-                new_params[i] = 'DEFAULT'
+            if col == id_col and i < len(params) and params[i] is None:
+                none_indices.append(i)
 
-        return new_sql, tuple(p for p in new_params if p != 'DEFAULT')
+        if not none_indices:
+            return sql, params
+
+        remaining_cols = [c for i, c in enumerate(cols) if i not in none_indices]
+        if not remaining_cols:
+            return sql, params
+
+        vals_match = re.search(
+            r'VALUES\s*\((.+)\)\s*;?\s*$', sql,
+            re.IGNORECASE | re.DOTALL)
+        if not vals_match:
+            return sql, params
+
+        vals_str = vals_match.group(1)
+        vals = [v.strip() for v in vals_str.split(',')]
+
+        new_vals = [v for i, v in enumerate(vals) if i not in none_indices]
+        new_params = tuple(p for i, p in enumerate(params) if i not in none_indices)
+
+        cols_clause = ', '.join(remaining_cols)
+        vals_clause = ', '.join(new_vals)
+
+        new_sql = re.sub(
+            r'(INSERT\s+(?:OR\s+REPLACE\s+)?INTO\s+\w+\s*)\([^)]+\)(\s*VALUES\s*)\(.+\)\s*;?\s*$',
+            r'\1(' + cols_clause + r')\2(' + vals_clause + r')',
+            sql, count=1, flags=re.IGNORECASE | re.DOTALL)
+
+        return new_sql, new_params
 
     def fetchone(self):
         if self._rows and len(self._rows) > 0:
