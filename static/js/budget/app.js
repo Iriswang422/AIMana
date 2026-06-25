@@ -599,6 +599,7 @@ const BudgetApp = {
     },
 
     bindEvents() {
+        console.log('bindEvents called'); console.log('import-excel-btn:', document.getElementById('import-excel-btn'));
         // 标签页切换
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -970,4 +971,5 @@ const BudgetApp = {
 document.addEventListener('DOMContentLoaded', () => {
     BudgetApp.init();
 });
+
 
