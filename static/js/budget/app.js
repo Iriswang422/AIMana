@@ -12,6 +12,7 @@ const BudgetApp = {
         await this.loadRiskRules();
         await this.loadPermissions();
         await this.loadChangeLog();
+        await this.loadActualsTable();
     },
 
     async loadTree() {
@@ -696,6 +697,15 @@ const BudgetApp = {
         document.getElementById('confirm-import-btn').addEventListener('click', () => {
             this.handleBudgetImport();
         });
+
+        // 实际成本上传
+        document.getElementById('preview-actuals-btn').addEventListener('click', () => {
+            this.handleActualsPreview();
+        });
+
+        document.getElementById('upload-actuals-btn').addEventListener('click', () => {
+            this.handleActualsUpload();
+        });
     },
 
     // ===== Excel 批量导入 =====
@@ -799,6 +809,139 @@ const BudgetApp = {
             }
         } catch (e) {
             statusDiv.innerHTML = `<div class="error">请求失败：${e.message}</div>`;
+        }
+    },
+
+    // ===== 实际成本上传 =====
+    async handleActualsPreview() {
+        const fileInput = document.getElementById('actuals-upload-file');
+        const statusDiv = document.getElementById('actuals-upload-status');
+
+        if (!fileInput.files.length) {
+            statusDiv.innerHTML = '<div class="error">请选择文件</div>';
+            return;
+        }
+
+        statusDiv.innerHTML = '<div class="info">解析中...</div>';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/api/budget/actuals-preview', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                const content = document.getElementById('actuals-preview-content');
+                content.innerHTML = `
+                    <p>共 ${result.total_rows} 条记录</p>
+                    <p>匹配成功：${result.matched_count}条，未匹配：${result.unmatched_count}条</p>
+                    ${result.warnings.length > 0 ? `<div class="warning" style="background:#fff3cd;padding:10px;border-radius:4px;margin:10px 0;">️ ${result.warnings.join('<br/>')}</div>` : ''}
+                    <h4>前20条预览:</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>负责人</th>
+                                <th>板块</th>
+                                <th>明细</th>
+                                <th>月份</th>
+                                <th>实际金额</th>
+                                <th>理由</th>
+                                <th>状态</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${result.preview.map(row => `
+                                <tr>
+                                    <td>${row.owner}</td>
+                                    <td>${row.category}</td>
+                                    <td>${row.item_name}</td>
+                                    <td>${row.month}</td>
+                                    <td>${this.formatMoney(row.actual_amount)}</td>
+                                    <td>${row.reason || '-'}</td>
+                                    <td>${row.matched ? '<span style="color:green">✓</span>' : '<span style="color:red">✗</span>'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+                document.getElementById('actuals-preview-modal').style.display = 'flex';
+                statusDiv.innerHTML = '<div class="success">解析成功，请预览后确认上传</div>';
+            } else {
+                statusDiv.innerHTML = `<div class="error">解析失败：${result.error}</div>`;
+            }
+        } catch (e) {
+            statusDiv.innerHTML = `<div class="error">请求失败：${e.message}</div>`;
+        }
+    },
+
+    async handleActualsUpload() {
+        const fileInput = document.getElementById('actuals-upload-file');
+        const statusDiv = document.getElementById('actuals-upload-status');
+
+        if (!fileInput.files.length) {
+            statusDiv.innerHTML = '<div class="error">请选择文件</div>';
+            return;
+        }
+
+        if (!confirm('确定要上传这些实际数数据吗？')) return;
+
+        statusDiv.innerHTML = '<div class="info">上传中...</div>';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        try {
+            const res = await fetch('/api/budget/actuals-upload', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+
+            if (result.success) {
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        上传成功！<br/>
+                        匹配：${result.matched_count}条，未匹配：${result.unmatched_count}条
+                    </div>
+                `;
+                fileInput.value = '';
+                await this.loadTree();
+                await this.loadAnalysis();
+                await this.loadRiskSummary();
+                await this.loadActualsTable();
+            } else {
+                statusDiv.innerHTML = `<div class="error">上传失败：${result.error}</div>`;
+            }
+        } catch (e) {
+            statusDiv.innerHTML = `<div class="error">请求失败：${e.message}</div>`;
+        }
+    },
+
+    async loadActualsTable() {
+        try {
+            const res = await fetch('/api/budget/actuals-list');
+            const result = await res.json();
+
+            if (result.success) {
+                const tbody = document.querySelector('#actuals-table tbody');
+                tbody.innerHTML = result.data.map(row => `
+                    <tr>
+                        <td>${row.owner_name}</td>
+                        <td>${row.category_name}</td>
+                        <td>${row.item_name}</td>
+                        <td>${row.month}</td>
+                        <td>${this.formatMoney(row.actual_amount)}</td>
+                        <td>${row.reason || '-'}</td>
+                        <td><span class="risk-badge risk-${(row.risk_level || 'unknown').toLowerCase()}">${row.risk_level || '-'}</span></td>
+                    </tr>
+                `).join('');
+            }
+        } catch (e) {
+            console.error('加载实际数列表失败:', e);
         }
     },
 
