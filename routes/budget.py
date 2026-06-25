@@ -257,3 +257,149 @@ def _find_item_id(tree, result):
                 if item['item_name'] == result['item_name']:
                     return item['id']
     return None
+
+
+@budget_bp.route('/import-preview', methods=['POST'])
+def import_preview():
+    """预览预算 Excel 导入内容"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': '没有文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': '没有选择文件'}), 400
+
+    filename = f"import_preview_{secure_filename(file.filename)}"
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(file_path)
+
+    try:
+        import pandas as pd
+        df = pd.read_excel(file_path, engine='openpyxl')
+
+        # 期望的列：负责人，板块，明细名称，原预算，当前预算
+        required_cols = ['负责人', '板块', '明细名称']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return jsonify({
+                'success': False,
+                'error': f'缺少列：{", ".join(missing_cols)}。需要列：负责人，板块，明细名称，原预算，当前预算'
+            }), 400
+
+        # 解析数据
+        rows = []
+        warnings = []
+        owners_set = set()
+        categories_set = set()
+
+        for idx, row in df.iterrows():
+            owner = str(row.get('负责人', '')).strip()
+            category = str(row.get('板块', '')).strip()
+            item_name = str(row.get('明细名称', '')).strip()
+
+            if not owner or not category or not item_name:
+                warnings.append(f'第{idx+2}行：负责人/板块/明细名称为空，已跳过')
+                continue
+
+            original_budget = float(row.get('原预算', 0) or 0)
+            current_budget = float(row.get('当前预算', 0) or 0)
+
+            rows.append({
+                'owner': owner,
+                'category': category,
+                'item_name': item_name,
+                'original_budget': original_budget,
+                'current_budget': current_budget
+            })
+            owners_set.add(owner)
+            categories_set.add(category)
+
+        # 清理临时文件
+        os.remove(file_path)
+
+        return jsonify({
+            'success': True,
+            'total_rows': len(rows),
+            'owners_count': len(owners_set),
+            'categories_count': len(categories_set),
+            'items_count': len(rows),
+            'warnings': warnings[:10],  # 最多10条警告
+            'preview': rows[:20]  # 预览前20条
+        })
+    except Exception as e:
+        # 清理临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'success': False, 'error': f'解析失败：{str(e)}'}), 500
+
+
+@budget_bp.route('/import', methods=['POST'])
+def import_budget():
+    """批量导入预算数据"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': '没有文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': '没有选择文件'}), 400
+
+    filename = f"import_{secure_filename(file.filename)}"
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(file_path)
+
+    try:
+        import pandas as pd
+        df = pd.read_excel(file_path, engine='openpyxl')
+
+        required_cols = ['负责人', '板块', '明细名称']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return jsonify({
+                'success': False,
+                'error': f'缺少列：{", ".join(missing_cols)}'
+            }), 400
+
+        # 按负责人分组导入
+        owners_created = 0
+        categories_created = 0
+        items_created = 0
+
+        for owner_name in df['负责人'].unique():
+            owner_df = df[df['负责人'] == owner_name]
+
+            # 创建或获取负责人
+            owner = budget_service.add_owner(owner_name, None)
+            owners_created += 1
+
+            for category_name in owner_df['板块'].unique():
+                cat_df = owner_df[owner_df['板块'] == category_name]
+
+                # 创建或获取板块
+                cat = budget_service.add_category(owner.id, category_name)
+                categories_created += 1
+
+                for _, row in cat_df.iterrows():
+                    item_name = str(row.get('明细名称', '')).strip()
+                    if not item_name:
+                        continue
+
+                    original_budget = float(row.get('原预算', 0) or 0)
+                    current_budget = float(row.get('当前预算', 0) or 0)
+
+                    # 创建明细
+                    budget_service.add_item(cat.id, item_name, original_budget, current_budget)
+                    items_created += 1
+
+        # 清理临时文件
+        os.remove(file_path)
+
+        return jsonify({
+            'success': True,
+            'owners_count': owners_created,
+            'categories_count': categories_created,
+            'items_count': items_created
+        })
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'success': False, 'error': f'导入失败：{str(e)}'}), 500
