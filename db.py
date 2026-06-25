@@ -118,7 +118,10 @@ class PgCursorWrapper:
         if get_db_type() == 'postgresql':
             sql, params = self._convert_none_to_default(sql, params)
 
-        translated = self._translate(sql, params)
+            if sql.strip().upper().startswith('INSERT OR REPLACE'):
+                return self._execute_upsert(sql, params)
+
+        translated = sql.replace('?', '%s') if get_db_type() == 'postgresql' else sql
 
         if translated.strip().upper().startswith('INSERT') and 'RETURNING' not in translated.upper():
             translated = translated.rstrip().rstrip(';') + ' RETURNING id'
@@ -135,6 +138,92 @@ class PgCursorWrapper:
             self._rows = None
 
         if translated.strip().upper().startswith('INSERT') and 'RETURNING' in translated.upper():
+            try:
+                row = self._cursor.fetchone()
+                if row:
+                    self._lastrowid = row[0]
+            except Exception:
+                pass
+
+        return self
+
+    def _execute_upsert(self, sql, params):
+        """Execute INSERT OR REPLACE as DELETE + INSERT for PostgreSQL"""
+        params = tuple(params)
+        sql_work = sql.replace('?', '%s')
+
+        table_match = re.search(r'INTO\s+(\w+)', sql_work, re.IGNORECASE)
+        if not table_match:
+            translated = sql_work.replace('INSERT OR REPLACE', 'INSERT', flags=re.IGNORECASE)
+            self._cursor.execute(translated, params)
+            return self
+
+        table = table_match.group(1)
+
+        cols_match = re.search(r'\(([^)]+)\)\s*VALUES', sql_work, re.IGNORECASE)
+        if not cols_match:
+            translated = sql_work.replace('INSERT OR REPLACE', 'INSERT', flags=re.IGNORECASE)
+            self._cursor.execute(translated, params)
+            return self
+
+        cols_str = cols_match.group(1)
+        cols = [c.strip().strip('"') for c in cols_str.split(',')]
+
+        pk_cols = self._get_pk_columns(table)
+        unique_constraints = self._get_unique_constraints(table)
+
+        if pk_cols and all(col in cols for col in pk_cols):
+            pk_ph = []
+            for col in pk_cols:
+                idx = cols.index(col)
+                if idx < len(params) and params[idx] is not None:
+                    pk_ph.append('%s')
+                else:
+                    pk_ph.append('NULL')
+            if 'NULL' not in pk_ph:
+                where = ' AND '.join(f'{c} = {p}' for c, p in zip(pk_cols, pk_ph))
+                delete_sql = f'DELETE FROM {table} WHERE {where}'
+                delete_params = tuple(params[cols.index(col)] for col in pk_cols)
+                self._cursor.execute(delete_sql, delete_params)
+
+        secondary = [
+            c for name, c in unique_constraints
+            if name != 'pk' and all(col in cols for col in c)
+        ]
+        for constraint in secondary:
+            phs = []
+            constraint_params = []
+            all_none = True
+            for col in constraint:
+                idx = cols.index(col)
+                if idx < len(params):
+                    if params[idx] is not None:
+                        phs.append('%s')
+                        constraint_params.append(params[idx])
+                        all_none = False
+                    else:
+                        phs.append('NULL')
+            if not all_none:
+                where = ' AND '.join(f'{c} = {p}' for c, p in zip(constraint, phs))
+                delete_sql = f'DELETE FROM {table} WHERE {where}'
+                self._cursor.execute(delete_sql, tuple(constraint_params))
+
+        insert_sql = re.sub(r'INSERT\s+OR\s+REPLACE', 'INSERT', sql_work, flags=re.IGNORECASE)
+        if 'RETURNING' not in insert_sql.upper():
+            insert_sql = insert_sql.rstrip().rstrip(';') + ' RETURNING id'
+
+        self._cursor.execute(insert_sql, params)
+
+        self._description = self._cursor.description
+        if self._cursor.description and self._cursor.rowcount >= 0:
+            try:
+                self._rows = self._cursor.fetchall()
+            except Exception:
+                self._rows = None
+        else:
+            self._rows = None
+
+        if 'RETURNING' in insert_sql.upper():
             try:
                 row = self._cursor.fetchone()
                 if row:
