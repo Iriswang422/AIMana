@@ -403,3 +403,155 @@ def import_budget():
         if os.path.exists(file_path):
             os.remove(file_path)
         return jsonify({'success': False, 'error': f'导入失败：{str(e)}'}), 500
+
+
+@budget_bp.route('/actuals-preview', methods=['POST'])
+def actuals_preview():
+    """预览实际数 Excel 内容"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': '没有文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': '没有选择文件'}), 400
+
+    filename = f"actuals_preview_{secure_filename(file.filename)}"
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(file_path)
+
+    try:
+        import pandas as pd
+        df = pd.read_excel(file_path, engine='openpyxl')
+
+        required_cols = ['负责人', '板块', '明细名称', '月份', '实际金额']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return jsonify({
+                'success': False,
+                'error': f'缺少列：{", ".join(missing_cols)}。需要列：负责人，板块，明细名称，月份，实际金额，变动理由'
+            }), 400
+
+        # 解析数据
+        rows = []
+        warnings = []
+        matched_count = 0
+        unmatched_count = 0
+
+        tree = budget_service.get_tree()
+
+        for idx, row in df.iterrows():
+            owner = str(row.get('负责人', '')).strip()
+            category = str(row.get('板块', '')).strip()
+            item_name = str(row.get('明细名称', '')).strip()
+            month = str(row.get('月份', '')).strip()
+            actual_amount = float(row.get('实际金额', 0) or 0)
+            reason = str(row.get('变动理由', '')).strip()
+
+            if not owner or not category or not item_name or not month:
+                warnings.append(f'第{idx+2}行：关键字段为空，已跳过')
+                unmatched_count += 1
+                continue
+
+            # 匹配明细 ID
+            item_id = find_item_id(tree, owner, category, item_name)
+
+            if item_id:
+                matched_count += 1
+            else:
+                unmatched_count += 1
+                warnings.append(f'第{idx+2}行：未找到匹配的明细 [{owner}/{category}/{item_name}]')
+
+            rows.append({
+                'owner': owner,
+                'category': category,
+                'item_name': item_name,
+                'month': month,
+                'actual_amount': actual_amount,
+                'reason': reason,
+                'matched': item_id is not None
+            })
+
+        os.remove(file_path)
+
+        return jsonify({
+            'success': True,
+            'total_rows': len(rows),
+            'matched_count': matched_count,
+            'unmatched_count': unmatched_count,
+            'warnings': warnings[:10],
+            'preview': rows[:20]
+        })
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'success': False, 'error': f'解析失败：{str(e)}'}), 500
+
+
+@budget_bp.route('/actuals-upload', methods=['POST'])
+def actuals_upload():
+    """上传实际数数据"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': '没有文件'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': '没有选择文件'}), 400
+
+    filename = f"actuals_{secure_filename(file.filename)}"
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(file_path)
+
+    try:
+        import pandas as pd
+        df = pd.read_excel(file_path, engine='openpyxl')
+
+        required_cols = ['负责人', '板块', '明细名称', '月份', '实际金额']
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return jsonify({
+                'success': False,
+                'error': f'缺少列：{", ".join(missing_cols)}'
+            }), 400
+
+        tree = budget_service.get_tree()
+        matched_count = 0
+        unmatched_count = 0
+
+        for idx, row in df.iterrows():
+            owner = str(row.get('负责人', '')).strip()
+            category = str(row.get('板块', '')).strip()
+            item_name = str(row.get('明细名称', '')).strip()
+            month = str(row.get('月份', '')).strip()
+            actual_amount = float(row.get('实际金额', 0) or 0)
+            reason = str(row.get('变动理由', '')).strip()
+
+            if not owner or not category or not item_name or not month:
+                unmatched_count += 1
+                continue
+
+            item_id = find_item_id(tree, owner, category, item_name)
+
+            if item_id:
+                budget_service.set_actual(item_id, month, actual_amount, reason)
+                matched_count += 1
+            else:
+                unmatched_count += 1
+
+        os.remove(file_path)
+
+        return jsonify({
+            'success': True,
+            'matched_count': matched_count,
+            'unmatched_count': unmatched_count
+        })
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'success': False, 'error': f'上传失败：{str(e)}'}), 500
+
+
+@budget_bp.route('/actuals-list', methods=['GET'])
+def actuals_list():
+    """获取所有实际数记录"""
+    actuals = budget_service.get_all_actuals()
+    return jsonify({'success': True, 'data': actuals})
